@@ -49,8 +49,8 @@ const TILES = {
 }
 
 const STORAGE_KEY = 'santa-maria-lots'
-// Barrio Santa María de Tigre — Av. Santa María de las Conchas 6385, Rincón de Milberg
-const DEFAULT_CENTER: [number, number] = [-34.4318, -58.6012]
+// Barrio Santa María de Tigre — J926+4H Rincón de Milberg
+const DEFAULT_CENTER: [number, number] = [-34.3997, -58.6386]
 const DEFAULT_ZOOM = 16
 
 // Límites aproximados del barrio para el overlay del plano (120 hectáreas)
