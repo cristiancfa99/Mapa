@@ -4,6 +4,7 @@ import {
   TileLayer,
   CircleMarker,
   Popup,
+  ImageOverlay,
   useMap,
   useMapEvents,
 } from 'react-leaflet'
@@ -51,6 +52,13 @@ const STORAGE_KEY = 'santa-maria-lots'
 // Barrio Santa María de Tigre — Av. Santa María de las Conchas 6385, Rincón de Milberg
 const DEFAULT_CENTER: [number, number] = [-34.4318, -58.6012]
 const DEFAULT_ZOOM = 16
+
+// Límites aproximados del barrio para el overlay del plano (120 hectáreas)
+// SW corner, NE corner — ajustable desde el panel admin
+const PLANO_BOUNDS_DEFAULT: [[number, number], [number, number]] = [
+  [-34.4362, -58.6072], // SW
+  [-34.4258, -58.5938], // NE
+]
 
 function loadLots(): Lot[] {
   try {
@@ -123,6 +131,13 @@ export default function App() {
   // Map control
   const [flyTarget, setFlyTarget] = useState<{ pos: [number, number]; zoom: number } | null>(null)
   const [tileLayer, setTileLayer] = useState<TileLayer>('satellite')
+
+  // Plano overlay
+  const [planoUrl, setPlanoUrl] = useState<string | null>(null)
+  const [planoOpacity, setPlanoOpacity] = useState(0.5)
+  const [planoVisible, setPlanoVisible] = useState(true)
+  // Fine-tuning offsets en grados (lat, lng)
+  const [planoOffset, setPlanoOffset] = useState({ lat: 0, lng: 0 })
 
   const handleSearch = () => {
     setSearchError('')
@@ -234,6 +249,26 @@ export default function App() {
     e.target.value = ''
   }
 
+  const handlePlanoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      setPlanoUrl(ev.target?.result as string)
+      setPlanoVisible(true)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const planoBounds: [[number, number], [number, number]] = [
+    [PLANO_BOUNDS_DEFAULT[0][0] + planoOffset.lat, PLANO_BOUNDS_DEFAULT[0][1] + planoOffset.lng],
+    [PLANO_BOUNDS_DEFAULT[1][0] + planoOffset.lat, PLANO_BOUNDS_DEFAULT[1][1] + planoOffset.lng],
+  ]
+
+  const movePlano = (dLat: number, dLng: number) =>
+    setPlanoOffset(o => ({ lat: o.lat + dLat, lng: o.lng + dLng }))
+
   const isAdminClickActive = mode === 'admin' && !!pendingLot
 
   return (
@@ -332,6 +367,15 @@ export default function App() {
               </CircleMarker>
             )
           })}
+          {/* Plano overlay */}
+          {planoUrl && planoVisible && (
+            <ImageOverlay
+              url={planoUrl}
+              bounds={planoBounds}
+              opacity={planoOpacity}
+              zIndex={5}
+            />
+          )}
         </MapContainer>
 
         {/* Crosshair overlay when placing a lot */}
@@ -498,6 +542,66 @@ export default function App() {
                       />
                     </label>
                   </div>
+                </div>
+
+                {/* Plano overlay section */}
+                <div className="plano-section">
+                  <p className="plano-title">🗒 Overlay del Plano</p>
+                  {!planoUrl ? (
+                    <label className="btn btn-sm btn-outline plano-upload-btn">
+                      📷 Cargar foto del plano
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={handlePlanoUpload}
+                      />
+                    </label>
+                  ) : (
+                    <div className="plano-controls">
+                      <div className="plano-row">
+                        <label className="plano-check">
+                          <input
+                            type="checkbox"
+                            checked={planoVisible}
+                            onChange={e => setPlanoVisible(e.target.checked)}
+                          />
+                          Visible
+                        </label>
+                        <label className="plano-check">
+                          ⬜ Opacidad
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="0.9"
+                            step="0.05"
+                            value={planoOpacity}
+                            onChange={e => setPlanoOpacity(Number(e.target.value))}
+                            className="opacity-slider"
+                          />
+                        </label>
+                      </div>
+                      <p className="plano-hint">Ajustá la posición si no coincide con el satélite:</p>
+                      <div className="plano-arrows">
+                        <button className="arr-btn" onClick={() => movePlano(0.0002, 0)}>▲</button>
+                        <div className="arr-mid">
+                          <button className="arr-btn" onClick={() => movePlano(0, -0.0003)}>◀</button>
+                          <button className="arr-btn arr-reset" onClick={() => setPlanoOffset({ lat: 0, lng: 0 })}>✕</button>
+                          <button className="arr-btn" onClick={() => movePlano(0, 0.0003)}>▶</button>
+                        </div>
+                        <button className="arr-btn" onClick={() => movePlano(-0.0002, 0)}>▼</button>
+                      </div>
+                      <label className="btn btn-sm btn-outline plano-upload-btn" style={{ marginTop: 8 }}>
+                        🔄 Cambiar imagen
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handlePlanoUpload}
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               </>
             )}
