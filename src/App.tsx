@@ -27,6 +27,25 @@ interface Lot {
 }
 
 type Mode = 'search' | 'admin'
+type TileLayer = 'map' | 'satellite'
+
+const TILES = {
+  map: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 20,
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, GeoEye, Earthstar Geographics',
+    maxZoom: 19,
+  },
+  satelliteLabels: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    attribution: '',
+    maxZoom: 19,
+  },
+}
 
 const STORAGE_KEY = 'santa-maria-lots'
 // Barrio Santa María de Tigre — Av. Santa María de las Conchas 6385, Rincón de Milberg
@@ -103,6 +122,7 @@ export default function App() {
 
   // Map control
   const [flyTarget, setFlyTarget] = useState<{ pos: [number, number]; zoom: number } | null>(null)
+  const [tileLayer, setTileLayer] = useState<TileLayer>('satellite')
 
   const handleSearch = () => {
     setSearchError('')
@@ -227,13 +247,22 @@ export default function App() {
             <p className="header-sub">Tigre, Buenos Aires</p>
           </div>
         </div>
-        <button
-          className={`icon-btn ${mode === 'admin' ? 'icon-btn--active' : ''}`}
-          onClick={switchMode}
-          title={mode === 'admin' ? 'Cerrar configuración' : 'Configurar lotes'}
-        >
-          {mode === 'admin' ? '✕' : '⚙'}
-        </button>
+        <div className="header-actions">
+          <button
+            className="tile-btn"
+            onClick={() => setTileLayer(t => t === 'map' ? 'satellite' : 'map')}
+            title={tileLayer === 'map' ? 'Ver satélite' : 'Ver mapa'}
+          >
+            {tileLayer === 'map' ? '🛰' : '🗺'}
+          </button>
+          <button
+            className={`icon-btn ${mode === 'admin' ? 'icon-btn--active' : ''}`}
+            onClick={switchMode}
+            title={mode === 'admin' ? 'Cerrar configuración' : 'Configurar lotes'}
+          >
+            {mode === 'admin' ? '✕' : '⚙'}
+          </button>
+        </div>
       </header>
 
       {/* ── Map ── */}
@@ -244,11 +273,27 @@ export default function App() {
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maxZoom={20}
-          />
+          {tileLayer === 'map' ? (
+            <TileLayer
+              attribution={TILES.map.attribution}
+              url={TILES.map.url}
+              maxZoom={TILES.map.maxZoom}
+            />
+          ) : (
+            <>
+              <TileLayer
+                attribution={TILES.satellite.attribution}
+                url={TILES.satellite.url}
+                maxZoom={TILES.satellite.maxZoom}
+              />
+              <TileLayer
+                attribution=""
+                url={TILES.satelliteLabels.url}
+                maxZoom={TILES.satelliteLabels.maxZoom}
+                opacity={0.8}
+              />
+            </>
+          )}
 
           <FlyController target={flyTarget} />
           <MapInteraction adminActive={isAdminClickActive} onMapClick={handleMapClick} />
