@@ -1,21 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
 import 'leaflet/dist/leaflet.css'
 import './index.css'
-
-function showFatalError(msg: string) {
-  document.body.style.cssText = 'margin:0;padding:24px;font-family:monospace;background:#fff;color:#c00'
-  document.body.innerHTML = `<h2>Error al cargar</h2><pre style="white-space:pre-wrap;font-size:13px;margin-top:12px">${msg}</pre>`
-}
-
-window.onerror = (_msg, _src, _line, _col, err) => {
-  showFatalError(String(err?.stack ?? err ?? _msg))
-  return true
-}
-
-window.addEventListener('unhandledrejection', e => {
-  showFatalError(String(e.reason?.stack ?? e.reason))
-})
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -43,19 +30,10 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-async function main() {
-  try {
-    const { default: App } = await import('./App.tsx')
-    ReactDOM.createRoot(document.getElementById('root')!).render(
-      <React.StrictMode>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-      </React.StrictMode>,
-    )
-  } catch (e) {
-    showFatalError(String((e as Error)?.stack ?? e))
-  }
-}
-
-main()
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </React.StrictMode>,
+)
