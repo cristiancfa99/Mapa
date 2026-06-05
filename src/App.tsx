@@ -29,9 +29,9 @@ interface Lot {
 type Mode = 'search' | 'admin'
 
 const STORAGE_KEY = 'santa-maria-lots'
-// Centro aproximado del barrio Santa María, Tigre, Buenos Aires
-const DEFAULT_CENTER: [number, number] = [-34.4264, -58.5792]
-const DEFAULT_ZOOM = 15
+// Barrio Santa María de Tigre — Av. Santa María de las Conchas 6385, Rincón de Milberg
+const DEFAULT_CENTER: [number, number] = [-34.4318, -58.6012]
+const DEFAULT_ZOOM = 16
 
 function loadLots(): Lot[] {
   try {
