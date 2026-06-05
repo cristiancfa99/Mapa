@@ -1,0 +1,464 @@
+import { useState, useEffect, useCallback } from 'react'
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Popup,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet'
+import L from 'leaflet'
+import './App.css'
+
+// Fix leaflet default icon path issue with Vite bundler
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+interface Lot {
+  manzana: number
+  lote: number
+  lat: number
+  lng: number
+  address?: string
+}
+
+type Mode = 'search' | 'admin'
+
+const STORAGE_KEY = 'santa-maria-lots'
+// Centro aproximado del barrio Santa María, Tigre, Buenos Aires
+const DEFAULT_CENTER: [number, number] = [-34.4264, -58.5792]
+const DEFAULT_ZOOM = 15
+
+function loadLots(): Lot[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY)
+    return data ? (JSON.parse(data) as Lot[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveLots(lots: Lot[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(lots))
+}
+
+// Moves the map to a given position — must be rendered inside MapContainer
+function FlyController({ target }: { target: { pos: [number, number]; zoom: number } | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (target) {
+      map.flyTo(target.pos, target.zoom, { duration: 1.2 })
+    }
+  }, [target, map])
+  return null
+}
+
+// Captures map clicks and changes cursor — must be rendered inside MapContainer
+function MapInteraction({
+  adminActive,
+  onMapClick,
+}: {
+  adminActive: boolean
+  onMapClick: (lat: number, lng: number) => void
+}) {
+  const map = useMapEvents({
+    click(e) {
+      if (adminActive) {
+        onMapClick(e.latlng.lat, e.latlng.lng)
+      }
+    },
+  })
+
+  useEffect(() => {
+    const container = map.getContainer()
+    container.style.cursor = adminActive ? 'crosshair' : ''
+    return () => {
+      container.style.cursor = ''
+    }
+  }, [adminActive, map])
+
+  return null
+}
+
+export default function App() {
+  const [lots, setLots] = useState<Lot[]>(loadLots)
+  const [mode, setMode] = useState<Mode>('search')
+
+  // Search panel state
+  const [searchMz, setSearchMz] = useState('')
+  const [searchLote, setSearchLote] = useState('')
+  const [foundLot, setFoundLot] = useState<Lot | null>(null)
+  const [searchError, setSearchError] = useState('')
+
+  // Admin panel state
+  const [adminMz, setAdminMz] = useState('')
+  const [adminLote, setAdminLote] = useState('')
+  const [adminAddress, setAdminAddress] = useState('')
+  const [pendingLot, setPendingLot] = useState<{ manzana: number; lote: number; address: string } | null>(null)
+  const [adminFeedback, setAdminFeedback] = useState<{ msg: string; ok: boolean } | null>(null)
+
+  // Map control
+  const [flyTarget, setFlyTarget] = useState<{ pos: [number, number]; zoom: number } | null>(null)
+
+  const handleSearch = () => {
+    setSearchError('')
+    const mz = parseInt(searchMz, 10)
+    const lt = parseInt(searchLote, 10)
+    if (!searchMz || !searchLote || isNaN(mz) || isNaN(lt) || mz < 1 || lt < 1) {
+      setSearchError('Ingresá números válidos de manzana y lote')
+      return
+    }
+    const lot = lots.find(l => l.manzana === mz && l.lote === lt)
+    if (!lot) {
+      setSearchError(`No se encontró Mz ${mz} - Lote ${lt}. ¿Está cargado en el sistema?`)
+      setFoundLot(null)
+      return
+    }
+    setFoundLot(lot)
+    setFlyTarget({ pos: [lot.lat, lot.lng], zoom: 19 })
+  }
+
+  const handleAdminPlace = () => {
+    const mz = parseInt(adminMz, 10)
+    const lt = parseInt(adminLote, 10)
+    if (isNaN(mz) || isNaN(lt) || mz < 1 || lt < 1) return
+    setPendingLot({ manzana: mz, lote: lt, address: adminAddress.trim() })
+    setAdminFeedback(null)
+  }
+
+  const handleMapClick = useCallback(
+    (lat: number, lng: number) => {
+      if (!pendingLot) return
+      const newLot: Lot = {
+        manzana: pendingLot.manzana,
+        lote: pendingLot.lote,
+        lat,
+        lng,
+        ...(pendingLot.address ? { address: pendingLot.address } : {}),
+      }
+      const updated = [
+        ...lots.filter(l => !(l.manzana === newLot.manzana && l.lote === newLot.lote)),
+        newLot,
+      ]
+      setLots(updated)
+      saveLots(updated)
+      setPendingLot(null)
+      setAdminMz('')
+      setAdminLote('')
+      setAdminAddress('')
+      setAdminFeedback({ msg: `✓ Mz ${newLot.manzana} - Lote ${newLot.lote} guardado`, ok: true })
+      setTimeout(() => setAdminFeedback(null), 3500)
+    },
+    [pendingLot, lots],
+  )
+
+  const handleDeleteLot = (manzana: number, lote: number) => {
+    const updated = lots.filter(l => !(l.manzana === manzana && l.lote === lote))
+    setLots(updated)
+    saveLots(updated)
+    if (foundLot?.manzana === manzana && foundLot?.lote === lote) {
+      setFoundLot(null)
+    }
+  }
+
+  const switchMode = () => {
+    setMode(m => (m === 'search' ? 'admin' : 'search'))
+    setPendingLot(null)
+    setAdminFeedback(null)
+  }
+
+  const openGoogleMaps = (lot: Lot) => {
+    window.open(
+      `https://www.google.com/maps/dir/?api=1&destination=${lot.lat},${lot.lng}&travelmode=driving`,
+      '_blank',
+    )
+  }
+
+  const openWaze = (lot: Lot) => {
+    window.open(`https://waze.com/ul?ll=${lot.lat},${lot.lng}&navigate=yes`, '_blank')
+  }
+
+  const exportData = () => {
+    const blob = new Blob([JSON.stringify(lots, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'santa-maria-lotes.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target?.result as string) as Lot[]
+        if (Array.isArray(data)) {
+          setLots(data)
+          saveLots(data)
+          setAdminFeedback({ msg: `✓ ${data.length} lotes importados`, ok: true })
+          setTimeout(() => setAdminFeedback(null), 3500)
+        }
+      } catch {
+        setAdminFeedback({ msg: 'Error al leer el archivo', ok: false })
+        setTimeout(() => setAdminFeedback(null), 3500)
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  const isAdminClickActive = mode === 'admin' && !!pendingLot
+
+  return (
+    <div className="app">
+      {/* ── Header ── */}
+      <header className="header">
+        <div className="header-left">
+          <span className="header-pin">📍</span>
+          <div>
+            <h1 className="header-title">Santa María GPS</h1>
+            <p className="header-sub">Tigre, Buenos Aires</p>
+          </div>
+        </div>
+        <button
+          className={`icon-btn ${mode === 'admin' ? 'icon-btn--active' : ''}`}
+          onClick={switchMode}
+          title={mode === 'admin' ? 'Cerrar configuración' : 'Configurar lotes'}
+        >
+          {mode === 'admin' ? '✕' : '⚙'}
+        </button>
+      </header>
+
+      {/* ── Map ── */}
+      <div className="map-wrapper">
+        <MapContainer
+          center={DEFAULT_CENTER}
+          zoom={DEFAULT_ZOOM}
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={false}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maxZoom={20}
+          />
+
+          <FlyController target={flyTarget} />
+          <MapInteraction adminActive={isAdminClickActive} onMapClick={handleMapClick} />
+
+          {lots.map(lot => {
+            const isSelected =
+              foundLot?.manzana === lot.manzana && foundLot?.lote === lot.lote
+            return (
+              <CircleMarker
+                key={`${lot.manzana}-${lot.lote}`}
+                center={[lot.lat, lot.lng]}
+                radius={isSelected ? 14 : 8}
+                pathOptions={{
+                  fillColor: isSelected ? '#ea4335' : '#1a73e8',
+                  fillOpacity: 1,
+                  color: 'white',
+                  weight: isSelected ? 3 : 2,
+                }}
+              >
+                <Popup>
+                  <div className="popup-inner">
+                    <strong>
+                      Mz {lot.manzana} — Lote {lot.lote}
+                    </strong>
+                    {lot.address && <p className="popup-address">{lot.address}</p>}
+                    {mode === 'admin' && (
+                      <button
+                        className="popup-delete"
+                        onClick={() => handleDeleteLot(lot.manzana, lot.lote)}
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </Popup>
+              </CircleMarker>
+            )
+          })}
+        </MapContainer>
+
+        {/* Crosshair overlay when placing a lot */}
+        {isAdminClickActive && (
+          <div className="map-overlay">
+            <div className="map-overlay-badge">
+              📌 Tocá en el mapa — Mz {pendingLot!.manzana} / Lote {pendingLot!.lote}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Bottom panel ── */}
+      <div className="panel">
+        {mode === 'search' ? (
+          /* Search panel */
+          <div className="search-panel">
+            <div className="row">
+              <div className="field">
+                <label htmlFor="s-mz">Manzana</label>
+                <input
+                  id="s-mz"
+                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={searchMz}
+                  onChange={e => setSearchMz(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                  placeholder="Ej: 5"
+                  min="1"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="s-lote">Lote</label>
+                <input
+                  id="s-lote"
+                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={searchLote}
+                  onChange={e => setSearchLote(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                  placeholder="Ej: 12"
+                  min="1"
+                />
+              </div>
+              <button className="btn btn-blue" onClick={handleSearch}>
+                Buscar
+              </button>
+            </div>
+
+            {searchError && <p className="msg msg-error">{searchError}</p>}
+
+            {foundLot && !searchError && (
+              <div className="result">
+                <p className="result-title">
+                  📍 Mz {foundLot.manzana} — Lote {foundLot.lote}
+                </p>
+                {foundLot.address && <p className="result-address">{foundLot.address}</p>}
+                <div className="nav-row">
+                  <button className="btn btn-blue nav-btn" onClick={() => openGoogleMaps(foundLot)}>
+                    🗺 Google Maps
+                  </button>
+                  <button className="btn btn-waze nav-btn" onClick={() => openWaze(foundLot)}>
+                    🚗 Waze
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {lots.length === 0 && (
+              <p className="hint">
+                No hay lotes cargados aún. Usá ⚙ para agregar las ubicaciones del barrio.
+              </p>
+            )}
+          </div>
+        ) : (
+          /* Admin panel */
+          <div className="admin-panel">
+            <p className="panel-title">⚙ Configurar Lotes</p>
+
+            {adminFeedback && (
+              <p className={`msg ${adminFeedback.ok ? 'msg-ok' : 'msg-error'}`}>
+                {adminFeedback.msg}
+              </p>
+            )}
+
+            {pendingLot ? (
+              <div className="pending-state">
+                <p className="pending-msg">
+                  Tocá en el mapa para colocar<br />
+                  <strong>Mz {pendingLot.manzana} — Lote {pendingLot.lote}</strong>
+                </p>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => setPendingLot(null)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="row">
+                  <div className="field">
+                    <label htmlFor="a-mz">Manzana</label>
+                    <input
+                      id="a-mz"
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={adminMz}
+                      onChange={e => setAdminMz(e.target.value)}
+                      placeholder="Ej: 5"
+                      min="1"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="a-lote">Lote</label>
+                    <input
+                      id="a-lote"
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={adminLote}
+                      onChange={e => setAdminLote(e.target.value)}
+                      placeholder="Ej: 12"
+                      min="1"
+                    />
+                  </div>
+                  <button
+                    className="btn btn-blue"
+                    onClick={handleAdminPlace}
+                    disabled={!adminMz || !adminLote}
+                  >
+                    Colocar
+                  </button>
+                </div>
+                <div className="field field-full">
+                  <label htmlFor="a-addr">Dirección (opcional)</label>
+                  <input
+                    id="a-addr"
+                    type="text"
+                    value={adminAddress}
+                    onChange={e => setAdminAddress(e.target.value)}
+                    placeholder="Ej: Calle Los Aromos 123"
+                  />
+                </div>
+
+                <div className="admin-footer">
+                  <span className="lot-count">
+                    {lots.length} {lots.length === 1 ? 'lote' : 'lotes'} cargado{lots.length !== 1 ? 's' : ''}
+                  </span>
+                  <div className="admin-actions">
+                    <button className="btn btn-sm btn-outline" onClick={exportData} title="Exportar lotes">
+                      ⬇ Exportar
+                    </button>
+                    <label className="btn btn-sm btn-outline" title="Importar lotes">
+                      ⬆ Importar
+                      <input
+                        type="file"
+                        accept=".json"
+                        style={{ display: 'none' }}
+                        onChange={importData}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
