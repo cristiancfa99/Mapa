@@ -28,7 +28,7 @@ interface Lot {
 }
 
 type Mode = 'search' | 'admin'
-type TileLayer = 'map' | 'satellite'
+type TileMode = 'map' | 'satellite'
 
 const TILES = {
   map: {
@@ -130,7 +130,7 @@ export default function App() {
 
   // Map control
   const [flyTarget, setFlyTarget] = useState<{ pos: [number, number]; zoom: number } | null>(null)
-  const [tileLayer, setTileLayer] = useState<TileLayer>('satellite')
+  const [tileLayer, setTileLayer] = useState<TileMode>('satellite')
 
   // Plano overlay
   const [planoUrl, setPlanoUrl] = useState<string | null>(null)
