@@ -38,14 +38,23 @@
         }
       });
       obs.observe(document.getElementById('root'), { childList: true });
-      // Timeout fallback: if nothing loaded after 10s, show error
+      // Probe: fetch the actual module script URL to see the HTTP status
       setTimeout(function() {
-        var b = document.getElementById('__boot');
-        if (b && b.parentNode) {
-          b.style.background = '#c00';
-          b.textContent = 'Error: el JavaScript no cargó. Recargá la página.';
-        }
-      }, 10000);
+        var ms = document.querySelector('script[type="module"][src]');
+        var url = ms ? ms.src : '(no module script found)';
+        fetch(url, {cache:'no-store'})
+          .then(function(r) {
+            var b = document.getElementById('__boot');
+            if (b && b.parentNode) {
+              b.style.background = r.ok ? '#137333' : '#c00';
+              b.textContent = 'HTTP ' + r.status + ' ' + r.statusText + ' — ' + r.url;
+            }
+          })
+          .catch(function(e) {
+            var b = document.getElementById('__boot');
+            if (b && b.parentNode) { b.style.background='#c00'; b.textContent = 'Fetch error: ' + String(e) + ' — url: ' + url; }
+          });
+      }, 3000);
     </script>
   </body>
 </html>
