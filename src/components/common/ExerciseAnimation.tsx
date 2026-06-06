@@ -1,13 +1,12 @@
 import React from 'react';
 
-type MovementType =
+export type MovementType =
   | 'push_h' | 'push_v' | 'pull_v' | 'pull_h'
   | 'squat' | 'hinge' | 'curl' | 'extension'
   | 'raise' | 'plank' | 'cardio' | 'hip_thrust';
 
 interface Props { type: MovementType; color: string; }
 
-/* Map exercise IDs → movement type */
 export const MOVEMENT_MAP: Record<string, MovementType> = {
   'bench-press': 'push_h', 'incline-bench': 'push_h', 'dumbbell-press': 'push_h',
   'decline-bench': 'push_h', 'close-grip-bench': 'push_h', 'chest-dips': 'push_h',
@@ -36,346 +35,684 @@ export const MOVEMENT_MAP: Record<string, MovementType> = {
   'hanging-leg-raise': 'pull_v', 'cable-kickback': 'extension',
 };
 
-/* ───── Individual animations ───── */
+/* ─── Shared tokens ──────────────────────────────────────────── */
+const T  = 'var(--text-2)';
+const SK = 'var(--card)';
+const EQ = 'var(--border)';
 
-const PushH: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 120" width="100%" style={{ maxHeight: 120 }}>
+/* Joint dot */
+const J: React.FC<{x:number; y:number; r?:number; c?:string}> = ({x,y,r=4.5,c}) =>
+  <circle cx={x} cy={y} r={r} fill={c ?? SK} stroke={T} strokeWidth="1.5" />;
+
+/* Label */
+const Lbl: React.FC<{text:string}> = ({text}) => (
+  <text x="100" y="192" textAnchor="middle" fontSize="9" fill="var(--text-3)"
+    fontFamily="system-ui,sans-serif" fontWeight="700" letterSpacing="0.8">
+    {text}
+  </text>
+);
+
+/* ══════════════════════════════════════════════════════════════
+   PRESS DE BANCA  —  vista lateral
+   Person lying on bench. Bar goes up (arms extend) then down.
+   ══════════════════════════════════════════════════════════════ */
+const PushH: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes barH { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-28px)} }
-      @keyframes armH { 0%,100%{d:path("M70 90 L100 80")} 50%{d:path("M70 90 L100 52")} }
-      @keyframes chestH{ 0%,100%{transform:scaleX(1)} 50%{transform:scaleX(0.85)} }
-      .bar-anim { animation: barH 2s ease-in-out infinite; transform-origin: 100px 80px; }
-      .arm-anim { animation: barH 2s ease-in-out infinite; transform-origin: 70px 90px; }
+      @keyframes ph { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-30px)} }
+      .ph { animation: ph 2.3s cubic-bezier(.37,0,.63,1) infinite; }
     `}</style>
+
     {/* Bench */}
-    <rect x="20" y="92" width="160" height="14" rx="4" fill="var(--border)" />
-    {/* Body on bench */}
-    <ellipse cx="100" cy="88" rx="60" ry="10" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    {/* Barbell */}
-    <g className="bar-anim">
-      <rect x="20" y="52" width="160" height="8" rx="4" fill={color} opacity="0.9" />
-      <circle cx="20" cy="56" r="10" fill={color} opacity="0.7" />
-      <circle cx="180" cy="56" r="10" fill={color} opacity="0.7" />
+    <rect x="8"  y="106" width="182" height="14" rx="6" fill={EQ} />
+    <rect x="24" y="120" width="10"  height="26" rx="4" fill={EQ} />
+    <rect x="166" y="120" width="10" height="26" rx="4" fill={EQ} />
+
+    {/* ─── Static body ─── */}
+    {/* Head */}
+    <circle cx="22" cy="88" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+    {/* Neck */}
+    <line x1="22" y1="102" x2="36" y2="102" stroke={T} strokeWidth="4" strokeLinecap="round"/>
+    {/* Torso */}
+    <rect x="36" y="90" width="98" height="17" rx="7" fill={SK} stroke={T} strokeWidth="2"/>
+    {/* Thigh */}
+    <line x1="134" y1="98" x2="160" y2="97" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+    {/* Knee */}
+    <J x={160} y={97} r={5}/>
+    {/* Shin */}
+    <line x1="160" y1="97" x2="170" y2="112" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+    {/* Foot */}
+    <line x1="170" y1="112" x2="186" y2="112" stroke={T} strokeWidth="6" strokeLinecap="round"/>
+
+    {/* ─── Animated: arms + barbell ─── */}
+    <g className="ph">
+      {/* Left upper arm */}
+      <line x1="62" y1="98" x2="60" y2="72" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <J x={60} y={72}/>
+      {/* Left forearm */}
+      <line x1="60" y1="72" x2="66" y2="55" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      {/* Right upper arm */}
+      <line x1="110" y1="98" x2="112" y2="72" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <J x={112} y={72}/>
+      {/* Right forearm */}
+      <line x1="112" y1="72" x2="106" y2="55" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      {/* Bar shaft */}
+      <rect x="10" y="50" width="178" height="7" rx="3.5" fill={color}/>
+      {/* Plates L */}
+      <rect x="8"  y="38" width="8"  height="31" rx="3" fill={color} opacity=".75"/>
+      <rect x="19" y="42" width="6"  height="23" rx="2" fill={color} opacity=".5"/>
+      {/* Plates R */}
+      <rect x="184" y="38" width="8" height="31" rx="3" fill={color} opacity=".75"/>
+      <rect x="175" y="42" width="6" height="23" rx="2" fill={color} opacity=".5"/>
+      {/* Knurling */}
+      <rect x="56" y="51" width="86" height="5" rx="2" fill={color} opacity=".45"/>
     </g>
-    {/* Arms */}
-    <g className="arm-anim">
-      <line x1="72" y1="87" x2="72" y2="58" stroke="var(--text-2)" strokeWidth="5" strokeLinecap="round" />
-      <line x1="128" y1="87" x2="128" y2="58" stroke="var(--text-2)" strokeWidth="5" strokeLinecap="round" />
-    </g>
-    {/* Labels */}
-    <text x="100" y="115" textAnchor="middle" fontSize="10" fill="var(--text-3)">EMPUJE HORIZONTAL</text>
+
+    <Lbl text="PRESS DE BANCA"/>
   </svg>
 );
 
-const PushV: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 140" width="100%" style={{ maxHeight: 140 }}>
+/* ══════════════════════════════════════════════════════════════
+   PRESS MILITAR  —  vista frontal
+   Person stands. Bar travels from shoulders to overhead.
+   ══════════════════════════════════════════════════════════════ */
+const PushV: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes barV { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-32px)} }
-      .barV-anim { animation: barV 2s ease-in-out infinite; transform-origin: 100px 70px; }
+      @keyframes pv { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-36px)} }
+      .pv { animation: pv 2.3s cubic-bezier(.37,0,.63,1) infinite; }
     `}</style>
-    {/* Standing person */}
-    <circle cx="100" cy="28" r="14" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <rect x="88" y="44" width="24" height="36" rx="4" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    {/* Legs */}
-    <line x1="95" y1="80" x2="85" y2="118" stroke="var(--border-light)" strokeWidth="5" strokeLinecap="round" />
-    <line x1="105" y1="80" x2="115" y2="118" stroke="var(--border-light)" strokeWidth="5" strokeLinecap="round" />
-    {/* Barbell */}
-    <g className="barV-anim">
-      <rect x="24" y="62" width="152" height="8" rx="4" fill={color} opacity="0.9" />
-      <circle cx="24" cy="66" r="10" fill={color} opacity="0.7" />
-      <circle cx="176" cy="66" r="10" fill={color} opacity="0.7" />
-      {/* Arms */}
-      <line x1="76" y1="62" x2="88" y2="62" stroke="var(--text-2)" strokeWidth="5" strokeLinecap="round" />
-      <line x1="124" y1="62" x2="112" y2="62" stroke="var(--text-2)" strokeWidth="5" strokeLinecap="round" />
+
+    {/* Floor */}
+    <rect x="30" y="178" width="140" height="6" rx="3" fill={EQ}/>
+
+    {/* Head */}
+    <circle cx="100" cy="22" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+    {/* Torso */}
+    <line x1="100" y1="37" x2="100" y2="96" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+    {/* Left thigh */}
+    <line x1="100" y1="96" x2="84" y2="140" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={84} y={140} r={5}/>
+    {/* Left shin */}
+    <line x1="84" y1="140" x2="82" y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    {/* Right thigh */}
+    <line x1="100" y1="96" x2="116" y2="140" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={116} y={140} r={5}/>
+    {/* Right shin */}
+    <line x1="116" y1="140" x2="118" y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+
+    {/* Animated: bar + arms */}
+    <g className="pv">
+      {/* Left upper arm */}
+      <line x1="76" y1="52" x2="52" y2="72" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <J x={52} y={72}/>
+      {/* Left forearm */}
+      <line x1="52" y1="72" x2="40" y2="96" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      {/* Right upper arm */}
+      <line x1="124" y1="52" x2="148" y2="72" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <J x={148} y={72}/>
+      {/* Right forearm */}
+      <line x1="148" y1="72" x2="160" y2="96" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      {/* Bar shaft */}
+      <rect x="18" y="92" width="164" height="7" rx="3.5" fill={color}/>
+      {/* Plates L */}
+      <rect x="10" y="80" width="10" height="31" rx="3" fill={color} opacity=".75"/>
+      <rect x="23" y="84" width="7"  height="23" rx="2" fill={color} opacity=".5"/>
+      {/* Plates R */}
+      <rect x="180" y="80" width="10" height="31" rx="3" fill={color} opacity=".75"/>
+      <rect x="170" y="84" width="7"  height="23" rx="2" fill={color} opacity=".5"/>
     </g>
-    <text x="100" y="133" textAnchor="middle" fontSize="10" fill="var(--text-3)">EMPUJE VERTICAL</text>
+
+    <Lbl text="PRESS MILITAR"/>
   </svg>
 );
 
-const PullV: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 150" width="100%" style={{ maxHeight: 150 }}>
+/* ══════════════════════════════════════════════════════════════
+   DOMINADA  —  vista frontal
+   Body hangs from bar and pulls upward.
+   ══════════════════════════════════════════════════════════════ */
+const PullV: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes pullV { 0%,100%{transform:translateY(0)} 50%{transform:translateY(32px)} }
-      .pullV-anim { animation: pullV 2s ease-in-out infinite; transform-origin: 100px 80px; }
+      @keyframes pullv { 0%,100%{transform:translateY(0)} 50%{transform:translateY(36px)} }
+      .pullv { animation: pullv 2.4s cubic-bezier(.37,0,.63,1) infinite; }
     `}</style>
-    {/* Bar at top */}
-    <rect x="20" y="18" width="160" height="10" rx="5" fill="var(--border-light)" />
-    <rect x="30" y="10" width="10" height="10" rx="2" fill="var(--border)" />
-    <rect x="160" y="10" width="10" height="10" rx="2" fill="var(--border)" />
-    {/* Hanging body */}
-    <g className="pullV-anim">
-      <circle cx="100" cy="54" r="14" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-      <rect x="88" y="70" width="24" height="34" rx="4" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-      {/* Arms */}
-      <line x1="100" y1="28" x2="76" y2="52" stroke={color} strokeWidth="5" strokeLinecap="round" opacity="0.9" />
-      <line x1="100" y1="28" x2="124" y2="52" stroke={color} strokeWidth="5" strokeLinecap="round" opacity="0.9" />
-      {/* Legs */}
-      <line x1="95" y1="104" x2="88" y2="134" stroke="var(--border-light)" strokeWidth="4" strokeLinecap="round" />
-      <line x1="105" y1="104" x2="112" y2="134" stroke="var(--border-light)" strokeWidth="4" strokeLinecap="round" />
+
+    {/* Bar & brackets */}
+    <rect x="16" y="14" width="168" height="10" rx="5" fill={EQ}/>
+    <rect x="22" y="6"  width="12"  height="10" rx="3" fill={EQ}/>
+    <rect x="166" y="6" width="12"  height="10" rx="3" fill={EQ}/>
+
+    {/* Animated body (starts high, drops to full hang) */}
+    <g className="pullv">
+      {/* Hands (grip) */}
+      <circle cx="64"  cy="24" r="6" fill={color} opacity=".85"/>
+      <circle cx="136" cy="24" r="6" fill={color} opacity=".85"/>
+      {/* Left arm: upper */}
+      <line x1="64"  y1="24" x2="76"  y2="50" stroke={color} strokeWidth="8" strokeLinecap="round"/>
+      <J x={76} y={50}/>
+      {/* Left arm: lower */}
+      <line x1="76"  y1="50" x2="88"  y2="68" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+      {/* Right arm: upper */}
+      <line x1="136" y1="24" x2="124" y2="50" stroke={color} strokeWidth="8" strokeLinecap="round"/>
+      <J x={124} y={50}/>
+      {/* Right arm: lower */}
+      <line x1="124" y1="50" x2="112" y2="68" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+      {/* Head */}
+      <circle cx="100" cy="74" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+      {/* Torso */}
+      <line x1="100" y1="89"  x2="100" y2="140" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+      {/* Left leg */}
+      <line x1="100" y1="140" x2="88"  y2="168" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+      <J x={88} y={168} r={5}/>
+      <line x1="88"  y1="168" x2="90"  y2="188" stroke={T} strokeWidth="6" strokeLinecap="round"/>
+      {/* Right leg */}
+      <line x1="100" y1="140" x2="112" y2="168" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+      <J x={112} y={168} r={5}/>
+      <line x1="112" y1="168" x2="110" y2="188" stroke={T} strokeWidth="6" strokeLinecap="round"/>
     </g>
-    <text x="100" y="148" textAnchor="middle" fontSize="10" fill="var(--text-3)">JALÓN VERTICAL</text>
+
+    <Lbl text="DOMINADA / PULL-UP"/>
   </svg>
 );
 
-const PullH: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 130" width="100%" style={{ maxHeight: 130 }}>
+/* ══════════════════════════════════════════════════════════════
+   REMO  —  vista lateral sentado
+   Handle travels toward abdomen.
+   ══════════════════════════════════════════════════════════════ */
+const PullH: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes pullH { 0%,100%{transform:translateX(0)} 50%{transform:translateX(-22px)} }
-      .pullH-anim { animation: pullH 2s ease-in-out infinite; transform-origin: 130px 60px; }
+      @keyframes pullh {
+        0%,100%{transform:translateX(0)}
+        50%{transform:translateX(-26px)}
+      }
+      .pullh { animation: pullh 2.3s cubic-bezier(.37,0,.63,1) infinite; }
     `}</style>
-    {/* Seated person */}
-    <ellipse cx="40" cy="88" rx="18" ry="8" fill="var(--border)" />
-    <circle cx="40" cy="52" r="13" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <rect x="30" y="65" width="20" height="28" rx="4" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
+
+    {/* Seat */}
+    <rect x="10" y="108" width="52" height="10" rx="4" fill={EQ}/>
+    <rect x="14" y="118" width="10" height="32" rx="3" fill={EQ}/>
+
     {/* Cable machine */}
-    <rect x="168" y="20" width="14" height="88" rx="4" fill="var(--border)" />
-    <circle cx="175" cy="62" r="8" fill="var(--border-light)" />
-    {/* Cable + handle */}
-    <g className="pullH-anim">
-      <line x1="56" y1="65" x2="167" y2="62" stroke={color} strokeWidth="2.5" strokeDasharray="4,3" opacity="0.8" />
-      <rect x="155" y="55" width="12" height="14" rx="3" fill={color} opacity="0.9" />
-      {/* Arm */}
-      <line x1="50" y1="68" x2="155" y2="62" stroke="var(--text-2)" strokeWidth="5" strokeLinecap="round" />
+    <rect x="170" y="14" width="18" height="100" rx="5" fill={EQ}/>
+    <circle cx="179" cy="62" r="9" fill={T} opacity=".4"/>
+
+    {/* Static body */}
+    {/* Head */}
+    <circle cx="36" cy="54" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+    {/* Torso (slight forward lean) */}
+    <line x1="36" y1="69" x2="42" y2="108" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+    {/* Thighs */}
+    <line x1="42" y1="108" x2="80" y2="108" stroke={T} strokeWidth="9"  strokeLinecap="round"/>
+    <line x1="42" y1="108" x2="74" y2="108" stroke={T} strokeWidth="9"  strokeLinecap="round"/>
+    {/* Shins (vertical down) */}
+    <line x1="80" y1="108" x2="78" y2="148" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    <J x={80} y={108} r={5}/>
+    <line x1="74" y1="108" x2="72" y2="148" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    {/* Feet */}
+    <line x1="72" y1="148" x2="88" y2="148" stroke={T} strokeWidth="6" strokeLinecap="round"/>
+
+    {/* Animated: arms + cable handle */}
+    <g className="pullh">
+      {/* Cable line */}
+      <line x1="78" y1="78" x2="170" y2="62" stroke={color} strokeWidth="2"
+        strokeDasharray="5,4" opacity=".7"/>
+      {/* Upper arm */}
+      <line x1="42" y1="80" x2="90"  y2="80" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+      <J x={90} y={80}/>
+      {/* Forearm */}
+      <line x1="90" y1="80" x2="148" y2="74" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      {/* Handle */}
+      <rect x="148" y="68" width="16" height="12" rx="4" fill={color} opacity=".9"/>
     </g>
-    <text x="100" y="118" textAnchor="middle" fontSize="10" fill="var(--text-3)">REMO HORIZONTAL</text>
+
+    <Lbl text="REMO CON CABLE"/>
   </svg>
 );
 
-const Squat: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 160" width="100%" style={{ maxHeight: 160 }}>
+/* ══════════════════════════════════════════════════════════════
+   SENTADILLA  —  vista lateral
+   Full body descends into squat; bar stays on back.
+   ══════════════════════════════════════════════════════════════ */
+const Squat: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes squat {
-        0%,100%{transform:translateY(0)}
-        50%{transform:translateY(28px)}
+      @keyframes sq {
+        0%,100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(32px);
+        }
       }
-      .squat-body { animation: squat 2s ease-in-out infinite; transform-origin: 100px 60px; }
+      @keyframes sqKnee {
+        0%,100% { transform: rotate(0deg); }
+        50%      { transform: rotate(28deg); }
+      }
+      .sq-body  { animation: sq 2.4s cubic-bezier(.37,0,.63,1) infinite; }
+      .sq-shin  { animation: sq 2.4s cubic-bezier(.37,0,.63,1) infinite; transform-origin: 84px 138px; }
+      .sq-shin2 { animation: sq 2.4s cubic-bezier(.37,0,.63,1) infinite; transform-origin: 116px 138px; }
     `}</style>
+
     {/* Floor */}
-    <rect x="20" y="148" width="160" height="6" rx="3" fill="var(--border)" />
-    {/* Barbell on back */}
-    <rect x="38" y="56" width="124" height="8" rx="4" fill={color} opacity="0.9" />
-    <circle cx="38" cy="60" r="9" fill={color} opacity="0.7" />
-    <circle cx="162" cy="60" r="9" fill={color} opacity="0.7" />
-    {/* Body */}
-    <g className="squat-body">
-      <circle cx="100" cy="38" r="13" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-      <rect x="88" y="53" width="24" height="30" rx="4" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
+    <rect x="24" y="178" width="152" height="6" rx="3" fill={EQ}/>
+
+    {/* Bar (on back, moves with body) */}
+    <g className="sq-body">
+      {/* Bar shaft */}
+      <rect x="14" y="44" width="172" height="7" rx="3.5" fill={color}/>
+      {/* Plates */}
+      <rect x="10"  y="33" width="8"  height="29" rx="3" fill={color} opacity=".75"/>
+      <rect x="182" y="33" width="8"  height="29" rx="3" fill={color} opacity=".75"/>
+      <rect x="21"  y="37" width="6"  height="21" rx="2" fill={color} opacity=".5"/>
+      <rect x="173" y="37" width="6"  height="21" rx="2" fill={color} opacity=".5"/>
+      {/* Head */}
+      <circle cx="100" cy="22" r="13" fill={SK} stroke={T} strokeWidth="2"/>
+      {/* Torso */}
+      <line x1="100" y1="36"  x2="100" y2="92" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+      {/* Arms holding bar */}
+      <line x1="100" y1="52" x2="70"  y2="52" stroke={color} strokeWidth="6" strokeLinecap="round"/>
+      <line x1="100" y1="52" x2="130" y2="52" stroke={color} strokeWidth="6" strokeLinecap="round"/>
+      {/* Hips */}
+      <line x1="88"  y1="92" x2="112" y2="92" stroke={T} strokeWidth="6" strokeLinecap="round"/>
       {/* Thighs */}
-      <line x1="92" y1="83" x2="76" y2="116" stroke="var(--text-2)" strokeWidth="7" strokeLinecap="round" />
-      <line x1="108" y1="83" x2="124" y2="116" stroke="var(--text-2)" strokeWidth="7" strokeLinecap="round" />
+      <line x1="88"  y1="92" x2="84"  y2="138" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <line x1="112" y1="92" x2="116" y2="138" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <J x={84}  y={138} r={5}/>
+      <J x={116} y={138} r={5}/>
       {/* Shins */}
-      <line x1="76" y1="116" x2="80" y2="148" stroke="var(--border-light)" strokeWidth="6" strokeLinecap="round" />
-      <line x1="124" y1="116" x2="120" y2="148" stroke="var(--border-light)" strokeWidth="6" strokeLinecap="round" />
+      <line x1="84"  y1="138" x2="78"  y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+      <line x1="116" y1="138" x2="122" y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
     </g>
-    <text x="100" y="158" textAnchor="middle" fontSize="10" fill="var(--text-3)">SENTADILLA / SQUAT</text>
+
+    <Lbl text="SENTADILLA / SQUAT"/>
   </svg>
 );
 
-const Hinge: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 160" width="100%" style={{ maxHeight: 160 }}>
+/* ══════════════════════════════════════════════════════════════
+   PESO MUERTO  —  vista lateral
+   Torso hinges forward; bar lifts from floor to hips.
+   ══════════════════════════════════════════════════════════════ */
+const Hinge: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes hinge {
-        0%,100%{transform:rotate(0deg)}
-        50%{transform:rotate(40deg)}
+      @keyframes hn {
+        0%,100% { transform: rotate(0deg); }
+        50%      { transform: rotate(48deg); }
       }
-      .hinge-torso { animation: hinge 2s ease-in-out infinite; transform-origin: 90px 104px; }
+      .hn-torso { animation: hn 2.4s cubic-bezier(.37,0,.63,1) infinite; transform-origin: 108px 106px; }
     `}</style>
+
     {/* Floor */}
-    <rect x="20" y="148" width="160" height="6" rx="3" fill="var(--border)" />
-    {/* Legs (static) */}
-    <line x1="80" y1="104" x2="75" y2="148" stroke="var(--border-light)" strokeWidth="7" strokeLinecap="round" />
-    <line x1="100" y1="104" x2="105" y2="148" stroke="var(--border-light)" strokeWidth="7" strokeLinecap="round" />
-    {/* Hinged torso */}
-    <g className="hinge-torso">
-      <rect x="68" y="78" width="24" height="28" rx="4" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-      <circle cx="80" cy="64" r="13" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
+    <rect x="14" y="176" width="172" height="6" rx="3" fill={EQ}/>
+
+    {/* Static legs */}
+    <line x1="92"  y1="106" x2="86"  y2="150" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={86} y={150} r={5}/>
+    <line x1="86"  y1="150" x2="84"  y2="176" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    <line x1="116" y1="106" x2="118" y2="150" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={118} y={150} r={5}/>
+    <line x1="118" y1="150" x2="120" y2="176" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+
+    {/* Animated torso + bar */}
+    <g className="hn-torso">
+      {/* Torso */}
+      <line x1="108" y1="106" x2="96" y2="56" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+      {/* Head */}
+      <circle cx="92" cy="44" r="13" fill={SK} stroke={T} strokeWidth="2"/>
+      {/* Left arm */}
+      <line x1="104" y1="82" x2="74"  y2="90" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+      <J x={74} y={90}/>
+      <line x1="74"  y1="90" x2="42"  y2="100" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      {/* Right arm */}
+      <line x1="110" y1="82" x2="134" y2="90" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+      <J x={134} y={90}/>
+      <line x1="134" y1="90" x2="162" y2="100" stroke={color} strokeWidth="7" strokeLinecap="round"/>
       {/* Barbell */}
-      <rect x="20" y="102" width="110" height="8" rx="4" fill={color} opacity="0.9" />
-      <circle cx="20" cy="106" r="9" fill={color} opacity="0.7" />
-      {/* Arms */}
-      <line x1="72" y1="100" x2="40" y2="106" stroke="var(--text-2)" strokeWidth="5" strokeLinecap="round" />
-      <line x1="90" y1="100" x2="110" y2="106" stroke="var(--text-2)" strokeWidth="5" strokeLinecap="round" />
+      <rect x="14"  y="96" width="170" height="7" rx="3.5" fill={color}/>
+      <rect x="10"  y="84" width="8"   height="31" rx="3" fill={color} opacity=".75"/>
+      <rect x="182" y="84" width="8"   height="31" rx="3" fill={color} opacity=".75"/>
     </g>
-    <text x="100" y="158" textAnchor="middle" fontSize="10" fill="var(--text-3)">BISAGRA DE CADERA</text>
+
+    <Lbl text="PESO MUERTO / HINGE"/>
   </svg>
 );
 
-const Curl: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 150" width="100%" style={{ maxHeight: 150 }}>
+/* ══════════════════════════════════════════════════════════════
+   CURL DE BÍCEPS  —  vista lateral
+   Forearm rotates upward around elbow joint.
+   ══════════════════════════════════════════════════════════════ */
+const Curl: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes curl {
-        0%,100%{transform:rotate(0deg)}
-        50%{transform:rotate(-105deg)}
+      @keyframes cu {
+        0%,100% { transform: rotate(0deg); }
+        50%      { transform: rotate(-112deg); }
       }
-      .curl-arm { animation: curl 2s ease-in-out infinite; transform-origin: 110px 85px; }
+      .cu-fore { animation: cu 2.2s cubic-bezier(.37,0,.63,1) infinite; transform-origin: 118px 90px; }
     `}</style>
-    {/* Person torso */}
-    <circle cx="100" cy="36" r="14" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <rect x="86" y="52" width="28" height="38" rx="5" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    {/* Static arm */}
-    <line x1="86" y1="64" x2="64" y2="118" stroke="var(--border-light)" strokeWidth="7" strokeLinecap="round" />
-    {/* Animated arm */}
-    <g className="curl-arm">
-      <line x1="110" y1="85" x2="110" y2="130" stroke={color} strokeWidth="7" strokeLinecap="round" opacity="0.9" />
-      {/* Weight */}
-      <circle cx="110" cy="135" r="10" fill={color} opacity="0.8" />
+
+    {/* Floor */}
+    <rect x="40" y="178" width="120" height="6" rx="3" fill={EQ}/>
+
+    {/* Body */}
+    <circle cx="100" cy="24" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+    <line x1="100" y1="39"  x2="100" y2="98" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+    {/* Legs */}
+    <line x1="100" y1="98"  x2="86"  y2="142" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={86} y={142} r={5}/>
+    <line x1="86"  y1="142" x2="84"  y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    <line x1="100" y1="98"  x2="114" y2="142" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={114} y={142} r={5}/>
+    <line x1="114" y1="142" x2="116" y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+
+    {/* Static (resting) arm */}
+    <line x1="82"  y1="58" x2="72"  y2="90" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+    <J x={72} y={90}/>
+    <line x1="72"  y1="90" x2="68"  y2="136" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    <ellipse cx="68" cy="144" rx="9" ry="6" fill={T} opacity=".35" transform="rotate(-10 68 144)"/>
+
+    {/* Active (curl) upper arm */}
+    <line x1="118" y1="58" x2="118" y2="90" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+    <J x={118} y={90}/>
+    {/* Animated forearm */}
+    <g className="cu-fore">
+      <line x1="118" y1="90" x2="118" y2="138" stroke={color} strokeWidth="8" strokeLinecap="round"/>
+      {/* Dumbbell */}
+      <rect x="108" y="138" width="20" height="8" rx="4" fill={color}/>
+      <rect x="104" y="134" width="8"  height="16" rx="3" fill={color} opacity=".7"/>
+      <rect x="128" y="134" width="8"  height="16" rx="3" fill={color} opacity=".7"/>
     </g>
-    <text x="100" y="148" textAnchor="middle" fontSize="10" fill="var(--text-3)">CURL / FLEXIÓN</text>
+
+    <Lbl text="CURL DE BÍCEPS"/>
   </svg>
 );
 
-const Extension: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 150" width="100%" style={{ maxHeight: 150 }}>
+/* ══════════════════════════════════════════════════════════════
+   EXTENSIÓN DE TRÍCEPS  —  vista lateral
+   Forearm extends downward (pushdown) or overhead.
+   ══════════════════════════════════════════════════════════════ */
+const Extension: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes ext {
-        0%,100%{transform:rotate(0deg)}
-        50%{transform:rotate(80deg)}
+      @keyframes ex {
+        0%,100% { transform: rotate(-85deg); }
+        50%      { transform: rotate(0deg); }
       }
-      .ext-arm { animation: ext 2s ease-in-out infinite; transform-origin: 100px 68px; }
+      .ex-fore { animation: ex 2.2s cubic-bezier(.37,0,.63,1) infinite; transform-origin: 118px 72px; }
     `}</style>
-    <circle cx="100" cy="36" r="14" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <rect x="86" y="52" width="28" height="38" rx="5" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <line x1="114" y1="64" x2="136" y2="120" stroke="var(--border-light)" strokeWidth="7" strokeLinecap="round" />
-    <g className="ext-arm">
-      <line x1="100" y1="68" x2="100" y2="120" stroke={color} strokeWidth="7" strokeLinecap="round" opacity="0.9" />
-      <circle cx="100" cy="124" r="10" fill={color} opacity="0.8" />
+
+    {/* Cable machine */}
+    <rect x="166" y="10" width="18" height="120" rx="5" fill={EQ}/>
+    <circle cx="175" cy="38" r="8" fill={T} opacity=".35"/>
+    {/* Cable to hand */}
+    <line x1="175" y1="46" x2="148" y2="72" stroke={color} strokeWidth="2" strokeDasharray="4,4" opacity=".6"/>
+
+    {/* Floor */}
+    <rect x="30" y="178" width="140" height="6" rx="3" fill={EQ}/>
+
+    {/* Body */}
+    <circle cx="100" cy="24" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+    <line x1="100" y1="39"  x2="100" y2="98" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+    <line x1="100" y1="98"  x2="86"  y2="142" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={86} y={142} r={5}/>
+    <line x1="86"  y1="142" x2="84"  y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    <line x1="100" y1="98"  x2="114" y2="142" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={114} y={142} r={5}/>
+    <line x1="114" y1="142" x2="116" y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+
+    {/* Active arm: upper arm pinned to side */}
+    <line x1="118" y1="52" x2="118" y2="72" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+    <J x={118} y={72}/>
+    {/* Animated forearm */}
+    <g className="ex-fore">
+      <line x1="118" y1="72" x2="118" y2="130" stroke={color} strokeWidth="8" strokeLinecap="round"/>
+      {/* Handle / rope */}
+      <rect x="108" y="128" width="20" height="8" rx="4" fill={color}/>
     </g>
-    <text x="100" y="146" textAnchor="middle" fontSize="10" fill="var(--text-3)">EXTENSIÓN</text>
+
+    {/* Static other arm */}
+    <line x1="82"  y1="58" x2="80"  y2="78" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+    <J x={80} y={78}/>
+    <line x1="80"  y1="78" x2="76"  y2="114" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+
+    <Lbl text="EXTENSIÓN DE TRÍCEPS"/>
   </svg>
 );
 
-const Raise: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 150" width="100%" style={{ maxHeight: 150 }}>
+/* ══════════════════════════════════════════════════════════════
+   ELEVACIÓN LATERAL  —  vista frontal
+   Both arms raise from sides to shoulder height.
+   ══════════════════════════════════════════════════════════════ */
+const Raise: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
     <style>{`
-      @keyframes raise {
-        0%,100%{transform:rotate(0deg)}
-        50%{transform:rotate(-70deg)}
+      @keyframes ra {
+        0%,100% { transform: rotate(0deg); }
+        50%      { transform: rotate(-68deg); }
       }
-      .raise-L { animation: raise 2s ease-in-out infinite; transform-origin: 78px 72px; }
-      .raise-R { animation: raise 2s ease-in-out infinite; transform-origin: 122px 72px; transform:scaleX(-1); }
+      @keyframes raR {
+        0%,100% { transform: rotate(0deg); }
+        50%      { transform: rotate(68deg); }
+      }
+      .ra-L { animation: ra  2.2s cubic-bezier(.37,0,.63,1) infinite; transform-origin: 76px 58px; }
+      .ra-R { animation: raR 2.2s cubic-bezier(.37,0,.63,1) infinite; transform-origin: 124px 58px; }
     `}</style>
-    <circle cx="100" cy="36" r="14" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <rect x="86" y="52" width="28" height="52" rx="5" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <g className="raise-L">
-      <line x1="78" y1="72" x2="44" y2="110" stroke={color} strokeWidth="6" strokeLinecap="round" opacity="0.9" />
-      <circle cx="40" cy="113" r="9" fill={color} opacity="0.8" />
+
+    {/* Floor */}
+    <rect x="30" y="178" width="140" height="6" rx="3" fill={EQ}/>
+
+    {/* Body */}
+    <circle cx="100" cy="22" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+    <line x1="100" y1="37"  x2="100" y2="96" stroke={T} strokeWidth="10" strokeLinecap="round"/>
+    <line x1="100" y1="96"  x2="84"  y2="140" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={84} y={140} r={5}/>
+    <line x1="84"  y1="140" x2="82"  y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    <line x1="100" y1="96"  x2="116" y2="140" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    <J x={116} y={140} r={5}/>
+    <line x1="116" y1="140" x2="118" y2="178" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+
+    {/* Left arm (animated) */}
+    <g className="ra-L">
+      <line x1="76" y1="58" x2="44" y2="90" stroke={color} strokeWidth="8" strokeLinecap="round"/>
+      <J x={44} y={90}/>
+      <line x1="44" y1="90" x2="36" y2="118" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      {/* Dumbbell */}
+      <ellipse cx="32" cy="122" rx="5" ry="10" fill={color} opacity=".8" transform="rotate(-20 32 122)"/>
     </g>
-    <g style={{ transform: 'scaleX(-1)', transformOrigin: '100px 72px' }}>
-      <g className="raise-L">
-        <line x1="78" y1="72" x2="44" y2="110" stroke={color} strokeWidth="6" strokeLinecap="round" opacity="0.9" />
-        <circle cx="40" cy="113" r="9" fill={color} opacity="0.8" />
+
+    {/* Right arm (animated) */}
+    <g className="ra-R">
+      <line x1="124" y1="58" x2="156" y2="90" stroke={color} strokeWidth="8" strokeLinecap="round"/>
+      <J x={156} y={90}/>
+      <line x1="156" y1="90" x2="164" y2="118" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      {/* Dumbbell */}
+      <ellipse cx="168" cy="122" rx="5" ry="10" fill={color} opacity=".8" transform="rotate(20 168 122)"/>
+    </g>
+
+    <Lbl text="ELEVACIÓN LATERAL"/>
+  </svg>
+);
+
+/* ══════════════════════════════════════════════════════════════
+   HIP THRUST  —  vista lateral
+   Hips drive upward from floor level.
+   ══════════════════════════════════════════════════════════════ */
+const HipThrust: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
+    <style>{`
+      @keyframes ht {
+        0%,100% { transform: translateY(0) rotate(0deg); }
+        50%      { transform: translateY(-28px) rotate(-10deg); }
+      }
+      .ht-body { animation: ht 2.2s cubic-bezier(.37,0,.63,1) infinite; transform-origin: 94px 114px; }
+    `}</style>
+
+    {/* Floor */}
+    <rect x="10" y="174" width="180" height="6" rx="3" fill={EQ}/>
+    {/* Bench */}
+    <rect x="10" y="96" width="58" height="14" rx="5" fill={EQ}/>
+    <rect x="14" y="110" width="12" height="22" rx="3" fill={EQ}/>
+
+    {/* Animated hip/torso group */}
+    <g className="ht-body">
+      {/* Upper back on bench */}
+      <rect x="18" y="80" width="46" height="18" rx="6" fill={SK} stroke={T} strokeWidth="2"/>
+      {/* Head */}
+      <circle cx="24" cy="68" r="13" fill={SK} stroke={T} strokeWidth="2"/>
+      {/* Glutes / hips */}
+      <ellipse cx="94" cy="108" rx="22" ry="16" fill={color} opacity=".8"/>
+      {/* Barbell over hips */}
+      <rect x="52" y="96" width="110" height="7" rx="3.5" fill={color} opacity=".7"/>
+      <rect x="48"  y="88" width="8"  height="23" rx="3" fill={color} opacity=".6"/>
+      <rect x="162" y="88" width="8"  height="23" rx="3" fill={color} opacity=".6"/>
+      {/* Thighs */}
+      <line x1="78"  y1="116" x2="74"  y2="162" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <J x={74} y={162} r={5}/>
+      <line x1="74"  y1="162" x2="66"  y2="174" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+      <line x1="112" y1="116" x2="120" y2="162" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <J x={120} y={162} r={5}/>
+      <line x1="120" y1="162" x2="130" y2="174" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+    </g>
+
+    <Lbl text="HIP THRUST / GLÚTEO"/>
+  </svg>
+);
+
+/* ══════════════════════════════════════════════════════════════
+   PLANCHA  —  vista lateral, isométrico con pulso de core
+   ══════════════════════════════════════════════════════════════ */
+const Plank: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
+    <style>{`
+      @keyframes pk { 0%,100%{opacity:.9; transform:scaleY(1)} 50%{opacity:.4; transform:scaleY(.8)} }
+      @keyframes pkGlow { 0%,100%{filter:drop-shadow(0 0 0px transparent)} 50%{filter:drop-shadow(0 0 6px ${color})} }
+      .pk-core { animation: pk 1.8s ease-in-out infinite; transform-origin: 110px 104px; }
+      .pk-body { animation: pkGlow 1.8s ease-in-out infinite; }
+    `}</style>
+
+    {/* Floor */}
+    <rect x="10" y="150" width="180" height="6" rx="3" fill={EQ}/>
+
+    <g className="pk-body">
+      {/* Head */}
+      <circle cx="168" cy="76" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+      {/* Torso */}
+      <rect x="52" y="98" width="116" height="14" rx="6" fill={SK} stroke={T} strokeWidth="2"/>
+      {/* Core highlight */}
+      <rect x="80" y="99" width="62" height="12" rx="5" fill={color} className="pk-core"/>
+      {/* Neck */}
+      <line x1="168" y1="90" x2="165" y2="100" stroke={T} strokeWidth="4" strokeLinecap="round"/>
+      {/* Forearms (elbows on ground) */}
+      <line x1="70"  y1="108" x2="52"  y2="150" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+      <J x={52} y={150} r={5}/>
+      <line x1="58"  y1="108" x2="42"  y2="150" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+      {/* Rear leg */}
+      <line x1="52"  y1="108" x2="30"  y2="150" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+      {/* Front leg */}
+      <line x1="64"  y1="108" x2="44"  y2="150" stroke={T} strokeWidth="8" strokeLinecap="round"/>
+    </g>
+
+    <Lbl text="PLANCHA / ISOMÉTRICO"/>
+  </svg>
+);
+
+/* ══════════════════════════════════════════════════════════════
+   CARDIO  —  figura corriendo, vista lateral
+   Alternating arms and legs with stride motion.
+   ══════════════════════════════════════════════════════════════ */
+const Cardio: React.FC<{color:string}> = ({color}) => (
+  <svg viewBox="0 0 200 196" width="100%">
+    <style>{`
+      @keyframes legFwd  { 0%,100%{transform:rotate(-28deg)} 50%{transform:rotate(38deg)} }
+      @keyframes legBck  { 0%,100%{transform:rotate(32deg)}  50%{transform:rotate(-34deg)} }
+      @keyframes armFwd  { 0%,100%{transform:rotate(36deg)}  50%{transform:rotate(-30deg)} }
+      @keyframes armBck  { 0%,100%{transform:rotate(-30deg)} 50%{transform:rotate(36deg)} }
+      @keyframes torsoB  { 0%,100%{transform:rotate(-4deg)}  50%{transform:rotate(4deg)} }
+      @keyframes shinF   { 0%,100%{transform:rotate(0deg)}   50%{transform:rotate(-40deg)} }
+      @keyframes shinB   { 0%,100%{transform:rotate(0deg)}   50%{transform:rotate(-55deg)} }
+      .leg-fwd  { animation: legFwd .65s ease-in-out infinite; transform-origin: 100px 96px; }
+      .leg-bck  { animation: legBck .65s ease-in-out infinite; transform-origin: 100px 96px; }
+      .arm-fwd  { animation: armFwd .65s ease-in-out infinite; transform-origin: 100px 56px; }
+      .arm-bck  { animation: armBck .65s ease-in-out infinite; transform-origin: 100px 56px; }
+      .torso-b  { animation: torsoB .65s ease-in-out infinite; transform-origin: 100px 76px; }
+      .shin-f   { animation: shinF  .65s ease-in-out infinite; transform-origin: 108px 138px; }
+      .shin-b   { animation: shinB  .65s ease-in-out infinite; transform-origin: 92px 138px; }
+    `}</style>
+
+    {/* Ground with motion lines */}
+    <rect x="10" y="172" width="180" height="5" rx="2" fill={EQ}/>
+    <line x1="20" y1="165" x2="50" y2="165" stroke={EQ} strokeWidth="2" strokeLinecap="round" opacity=".5"/>
+    <line x1="10" y1="161" x2="34" y2="161" stroke={EQ} strokeWidth="2" strokeLinecap="round" opacity=".3"/>
+
+    {/* Head */}
+    <circle cx="100" cy="24" r="14" fill={SK} stroke={T} strokeWidth="2"/>
+
+    {/* Torso (slight bob) */}
+    <g className="torso-b">
+      <line x1="100" y1="39" x2="100" y2="96" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+    </g>
+
+    {/* Front arm */}
+    <g className="arm-fwd">
+      <line x1="100" y1="56" x2="80"  y2="84" stroke={color} strokeWidth="7" strokeLinecap="round"/>
+      <J x={80} y={84}/>
+      <line x1="80"  y1="84" x2="68"  y2="64" stroke={color} strokeWidth="6" strokeLinecap="round"/>
+    </g>
+
+    {/* Back arm */}
+    <g className="arm-bck">
+      <line x1="100" y1="56" x2="122" y2="82" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+      <J x={122} y={82}/>
+      <line x1="122" y1="82" x2="138" y2="64" stroke={T} strokeWidth="6" strokeLinecap="round"/>
+    </g>
+
+    {/* Front leg (thigh) */}
+    <g className="leg-fwd">
+      <line x1="100" y1="96" x2="108" y2="138" stroke={color} strokeWidth="9" strokeLinecap="round"/>
+      <J x={108} y={138} r={5}/>
+      {/* Front shin */}
+      <g className="shin-f">
+        <line x1="108" y1="138" x2="112" y2="172" stroke={color} strokeWidth="7" strokeLinecap="round"/>
       </g>
     </g>
-    <text x="100" y="144" textAnchor="middle" fontSize="10" fill="var(--text-3)">ELEVACIÓN</text>
+
+    {/* Back leg (thigh) */}
+    <g className="leg-bck">
+      <line x1="100" y1="96" x2="92"  y2="138" stroke={T} strokeWidth="9" strokeLinecap="round"/>
+      <J x={92} y={138} r={5}/>
+      {/* Back shin */}
+      <g className="shin-b">
+        <line x1="92"  y1="138" x2="88"  y2="172" stroke={T} strokeWidth="7" strokeLinecap="round"/>
+      </g>
+    </g>
+
+    <Lbl text="EJERCICIO CARDIOVASCULAR"/>
   </svg>
 );
 
-const HipThrust: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 130" width="100%" style={{ maxHeight: 130 }}>
-    <style>{`
-      @keyframes hip {
-        0%,100%{transform:translateY(0) rotate(0deg)}
-        50%{transform:translateY(-24px) rotate(-12deg)}
-      }
-      .hip-body { animation: hip 2s ease-in-out infinite; transform-origin: 100px 90px; }
-    `}</style>
-    {/* Bench */}
-    <rect x="16" y="76" width="55" height="18" rx="5" fill="var(--border)" />
-    {/* Floor */}
-    <rect x="20" y="122" width="160" height="6" rx="3" fill="var(--border)" />
-    <g className="hip-body">
-      {/* Upper back on bench */}
-      <rect x="24" y="62" width="40" height="18" rx="4" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-      {/* Head */}
-      <circle cx="26" cy="54" r="12" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-      {/* Hips / glutes */}
-      <ellipse cx="92" cy="74" rx="20" ry="14" fill={color} opacity="0.85" />
-      {/* Barbell */}
-      <rect x="64" y="64" width="90" height="8" rx="4" fill={color} opacity="0.6" />
-      {/* Thighs */}
-      <line x1="72" y1="84" x2="72" y2="120" stroke="var(--text-2)" strokeWidth="7" strokeLinecap="round" />
-      <line x1="106" y1="84" x2="116" y2="120" stroke="var(--text-2)" strokeWidth="7" strokeLinecap="round" />
-    </g>
-    <text x="100" y="130" textAnchor="middle" fontSize="10" fill="var(--text-3)">HIP THRUST / GLÚTEO</text>
-  </svg>
-);
-
-const Plank: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 100" width="100%" style={{ maxHeight: 100 }}>
-    <style>{`
-      @keyframes plk { 0%,100%{opacity:1} 50%{opacity:0.5} }
-      .plk-core { animation: plk 2s ease-in-out infinite; }
-    `}</style>
-    <rect x="20" y="88" width="160" height="6" rx="3" fill="var(--border)" />
-    {/* Body in plank */}
-    <circle cx="164" cy="60" r="13" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <rect x="60" y="63" width="104" height="16" rx="6" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    {/* Core highlight */}
-    <rect x="88" y="64" width="48" height="14" rx="5" fill={color} opacity="0.7" className="plk-core" />
-    {/* Arms */}
-    <line x1="62" y1="70" x2="38" y2="88" stroke="var(--border-light)" strokeWidth="6" strokeLinecap="round" />
-    <line x1="74" y1="79" x2="52" y2="88" stroke="var(--border-light)" strokeWidth="6" strokeLinecap="round" />
-    {/* Feet */}
-    <line x1="60" y1="78" x2="38" y2="88" stroke="var(--border-light)" strokeWidth="6" strokeLinecap="round" />
-    <text x="100" y="100" textAnchor="middle" fontSize="10" fill="var(--text-3)">ESTABILIZACIÓN / ISOMÉTRICO</text>
-  </svg>
-);
-
-const Cardio: React.FC<{ color: string }> = ({ color }) => (
-  <svg viewBox="0 0 200 130" width="100%" style={{ maxHeight: 130 }}>
-    <style>{`
-      @keyframes run {
-        0%  { transform: translateX(0) }
-        100%{ transform: translateX(0) }
-        25% { transform: translateX(10px) }
-        75% { transform: translateX(-10px) }
-      }
-      @keyframes legF { 0%,100%{transform:rotate(-20deg)} 50%{transform:rotate(40deg)} }
-      @keyframes legB { 0%,100%{transform:rotate(20deg)} 50%{transform:rotate(-40deg)} }
-      @keyframes armF { 0%,100%{transform:rotate(30deg)} 50%{transform:rotate(-30deg)} }
-      .legF { animation: legF 0.7s ease-in-out infinite; transform-origin: 100px 80px; }
-      .legB { animation: legB 0.7s ease-in-out infinite; transform-origin: 100px 80px; }
-      .armF { animation: armF 0.7s ease-in-out infinite; transform-origin: 100px 62px; }
-      .armB { animation: armF 0.7s ease-in-out infinite reverse; transform-origin: 100px 62px; }
-    `}</style>
-    {/* Ground */}
-    <rect x="20" y="118" width="160" height="5" rx="2" fill="var(--border)" />
-    {/* Runner */}
-    <circle cx="100" cy="36" r="14" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    <rect x="88" y="52" width="24" height="30" rx="5" fill="var(--card)" stroke="var(--border-light)" strokeWidth="1.5" />
-    {/* Legs */}
-    <g className="legF">
-      <line x1="100" y1="80" x2="88" y2="118" stroke={color} strokeWidth="7" strokeLinecap="round" opacity="0.9" />
-    </g>
-    <g className="legB">
-      <line x1="100" y1="80" x2="112" y2="118" stroke="var(--border-light)" strokeWidth="7" strokeLinecap="round" />
-    </g>
-    {/* Arms */}
-    <g className="armF">
-      <line x1="88" y1="62" x2="70" y2="90" stroke={color} strokeWidth="5" strokeLinecap="round" opacity="0.9" />
-    </g>
-    <g className="armB">
-      <line x1="112" y1="62" x2="130" y2="90" stroke="var(--border-light)" strokeWidth="5" strokeLinecap="round" />
-    </g>
-    <text x="100" y="128" textAnchor="middle" fontSize="10" fill="var(--text-3)">EJERCICIO CARDIOVASCULAR</text>
-  </svg>
-);
-
+/* ══════════════════════════════════════════════════════════════
+   Exported component
+   ══════════════════════════════════════════════════════════════ */
 export const ExerciseAnimation: React.FC<Props> = ({ type, color }) => {
-  const props = { color };
-  const map: Record<MovementType, React.ReactNode> = {
-    push_h:    <PushH {...props} />,
-    push_v:    <PushV {...props} />,
-    pull_v:    <PullV {...props} />,
-    pull_h:    <PullH {...props} />,
-    squat:     <Squat {...props} />,
-    hinge:     <Hinge {...props} />,
-    curl:      <Curl {...props} />,
-    extension: <Extension {...props} />,
-    raise:     <Raise {...props} />,
-    hip_thrust:<HipThrust {...props} />,
-    plank:     <Plank {...props} />,
-    cardio:    <Cardio {...props} />,
+  const map: Record<MovementType, React.ReactElement> = {
+    push_h:     <PushH    color={color}/>,
+    push_v:     <PushV    color={color}/>,
+    pull_v:     <PullV    color={color}/>,
+    pull_h:     <PullH    color={color}/>,
+    squat:      <Squat    color={color}/>,
+    hinge:      <Hinge    color={color}/>,
+    curl:       <Curl     color={color}/>,
+    extension:  <Extension color={color}/>,
+    raise:      <Raise    color={color}/>,
+    hip_thrust: <HipThrust color={color}/>,
+    plank:      <Plank    color={color}/>,
+    cardio:     <Cardio   color={color}/>,
   };
-  return <div style={{ padding: '12px 0' }}>{map[type]}</div>;
+  return (
+    <div style={{ padding: '8px 16px', width: '100%', maxWidth: 320, margin: '0 auto' }}>
+      {map[type]}
+    </div>
+  );
 };
