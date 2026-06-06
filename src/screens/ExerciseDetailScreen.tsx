@@ -1,7 +1,9 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { CheckCircle, AlertTriangle, Lightbulb, Trophy } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Lightbulb, Trophy, Youtube } from 'lucide-react';
 import { Header } from '../components/common/Header';
+import { MuscleMap } from '../components/common/MuscleMap';
+import { ExerciseAnimation, MOVEMENT_MAP } from '../components/common/ExerciseAnimation';
 import { getExerciseById, muscleGroups, equipmentLabels, difficultyLabels } from '../data/exercises';
 import { mockPRs } from '../data/mockData';
 
@@ -38,18 +40,22 @@ export const ExerciseDetailScreen: React.FC = () => {
       {/* Hero */}
       <div style={{
         background: `linear-gradient(160deg, ${mainColor}30, transparent)`,
-        padding: '24px 20px 32px',
+        padding: '24px 20px 20px',
         textAlign: 'center',
       }}>
+        {/* Animated exercise demo */}
         <div style={{
-          width: 80, height: 80, borderRadius: 24,
-          background: `${mainColor}20`, margin: '0 auto 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40,
+          background: `${mainColor}12`, borderRadius: 20,
+          padding: '16px 0 8px', marginBottom: 16,
+          display: 'flex', justifyContent: 'center',
         }}>
-          🏋️
+          <ExerciseAnimation
+            type={MOVEMENT_MAP[exercise.id] ?? 'push_h'}
+            color={mainColor}
+          />
         </div>
         <h2 style={{ fontSize: 22, marginBottom: 12 }}>{exercise.name}</h2>
-        <div className="flex justify-center gap-8 flex-wrap">
+        <div className="flex justify-center gap-8 flex-wrap" style={{ marginBottom: 16 }}>
           <span className="badge" style={{ background: `${mainColor}20`, color: mainColor }}>
             {muscleName}
           </span>
@@ -63,6 +69,22 @@ export const ExerciseDetailScreen: React.FC = () => {
             {difficultyLabels[exercise.difficulty]}
           </span>
         </div>
+        {/* YouTube link */}
+        <a
+          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(exercise.name + ' tutorial tecnica correcta')}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: '#FF000022', color: '#FF4444',
+            border: '1px solid #FF444433', borderRadius: 12,
+            padding: '8px 18px', fontSize: 13, fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          <Youtube size={16} />
+          Ver tutorial en YouTube
+        </a>
       </div>
 
       <div style={{ padding: '0 16px 32px' }}>
@@ -90,29 +112,26 @@ export const ExerciseDetailScreen: React.FC = () => {
 
         {/* Muscles */}
         <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <h4 style={{ marginBottom: 12 }}>Músculos Trabajados</h4>
-          <div>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 6 }}>Principal</p>
-            <div className="flex items-center gap-8">
+          <h4 style={{ marginBottom: 14 }}>Músculos Trabajados</h4>
+          <MuscleMap primary={exercise.muscleGroup} secondary={exercise.secondaryMuscles} />
+          <div style={{ marginTop: 14 }}>
+            <div className="flex items-center gap-8" style={{ marginBottom: 8 }}>
               <span className="muscle-dot" style={{ background: mainColor }} />
-              <span style={{ fontSize: 14, fontWeight: 500 }}>{muscleName}</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Principal: {muscleName}</span>
             </div>
-          </div>
-          {exercise.secondaryMuscles.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 6 }}>Secundarios</p>
+            {exercise.secondaryMuscles.length > 0 && (
               <div className="flex flex-wrap gap-8">
                 {exercise.secondaryMuscles.map(m => (
                   <div key={m} className="flex items-center gap-6">
                     <span className="muscle-dot" style={{ background: MUSCLE_COLORS[m] ?? '#888' }} />
-                    <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
                       {muscleGroups.find(mg => mg.id === m)?.label}
                     </span>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Description */}
