@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/santa-maria-tigre-gps-app-YJTWP
+      - claude/fitness-app-full-stack-gNOEF
   workflow_dispatch:
 
 permissions:
