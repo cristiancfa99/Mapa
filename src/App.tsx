@@ -53,11 +53,12 @@ const STORAGE_KEY = 'santa-maria-lots'
 const DEFAULT_CENTER: [number, number] = [-34.3997, -58.6386]
 const DEFAULT_ZOOM = 16
 
-// Límites aproximados del barrio para el overlay del plano (120 hectáreas)
-// SW corner, NE corner — ajustable desde el panel admin
+// Límites aproximados del barrio para el overlay del plano
+// SW corner, NE corner — la GUARDIA está en el extremo SE (~-34.3997,-58.6386)
+// El barrio se extiende ~2km hacia el NO
 const PLANO_BOUNDS_DEFAULT: [[number, number], [number, number]] = [
-  [-34.4362, -58.6072], // SW
-  [-34.4258, -58.5938], // NE
+  [-34.4100, -58.6650], // SW
+  [-34.3870, -58.6200], // NE
 ]
 
 function loadLots(): Lot[] {
