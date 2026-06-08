@@ -64,10 +64,12 @@ const PLANO_BOUNDS_DEFAULT: [[number, number], [number, number]] = [
 function loadLots(): Lot[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY)
-    return data ? (JSON.parse(data) as Lot[]) : []
+    if (data) return JSON.parse(data) as Lot[]
   } catch {
-    return []
+    // ignore
   }
+  saveLots(DEFAULT_LOTS)
+  return DEFAULT_LOTS
 }
 
 function saveLots(lots: Lot[]): void {
@@ -149,7 +151,7 @@ export default function App() {
     const mz = parseInt(searchMz, 10)
     const lt = parseInt(searchLote, 10)
     if (!searchMz || !searchLote || isNaN(mz) || isNaN(lt) || mz < 1 || lt < 1) {
-      setSearchError('Ingresá números válidos de manzana y lote')
+      setSearchError('Ingresá manzana y lote válidos')
       return
     }
     const lot = lots.find(l => l.manzana === mz && l.lote === lt)
@@ -161,6 +163,8 @@ export default function App() {
     }
     setFoundLot(lot)
     setFlyTarget({ pos: [lot.lat, lot.lng], zoom: 19 })
+    // Open Google Maps pin immediately
+    openGoogleMapsPin(lot)
   }
 
   const handleAdminPlace = () => {
@@ -212,7 +216,13 @@ export default function App() {
     setAdminFeedback(null)
   }
 
-  const openGoogleMaps = (lot: Lot) => {
+  // Opens Google Maps with a pin at the lot location (no auto-navigation)
+  const openGoogleMapsPin = (lot: Lot) => {
+    window.open(`https://maps.google.com/?q=${lot.lat},${lot.lng}`, '_blank')
+  }
+
+  // Opens Google Maps navigation (turn-by-turn)
+  const openGoogleMapsNav = (lot: Lot) => {
     window.open(
       `https://www.google.com/maps/dir/?api=1&destination=${lot.lat},${lot.lng}&travelmode=driving`,
       '_blank',
@@ -229,10 +239,7 @@ export default function App() {
   }
 
   const openGoogleMapsEntrance = () => {
-    window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}&travelmode=driving`,
-      '_blank',
-    )
+    window.open(`https://maps.google.com/?q=${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}`, '_blank')
   }
 
   const exportData = () => {
@@ -453,9 +460,12 @@ export default function App() {
                   📍 Mz {foundLot.manzana} — Lote {foundLot.lote}
                 </p>
                 {foundLot.address && <p className="result-address">{foundLot.address}</p>}
-                <div className="nav-row">
-                  <button className="btn btn-blue nav-btn" onClick={() => openGoogleMaps(foundLot)}>
-                    🗺 Google Maps
+                <button className="btn btn-blue nav-btn-full" onClick={() => openGoogleMapsPin(foundLot)}>
+                  📌 Ver pin en Google Maps
+                </button>
+                <div className="nav-row" style={{ marginTop: 6 }}>
+                  <button className="btn btn-outline nav-btn" onClick={() => openGoogleMapsNav(foundLot)}>
+                    🗺 Cómo llegar
                   </button>
                   <button className="btn btn-waze nav-btn" onClick={() => openWaze(foundLot)}>
                     🚗 Waze
