@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import DEFAULT_LOTS from './defaultLots'
 import {
   MapContainer,
   TileLayer,
@@ -19,7 +20,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-interface Lot {
+export interface Lot {
   manzana: number
   lote: number
   lat: number
@@ -53,21 +54,22 @@ const STORAGE_KEY = 'santa-maria-lots'
 const DEFAULT_CENTER: [number, number] = [-34.3997, -58.6386]
 const DEFAULT_ZOOM = 16
 
-// Límites aproximados del barrio para el overlay del plano
-// SW corner, NE corner — la GUARDIA está en el extremo SE (~-34.3997,-58.6386)
-// El barrio se extiende ~2km hacia el NO
+// Límites del plano derivados del DWG AutoCAD 1:5000 + anchor GUARDIA=-34.3997,-58.6386
 const PLANO_BOUNDS_DEFAULT: [[number, number], [number, number]] = [
-  [-34.4100, -58.6650], // SW
-  [-34.3870, -58.6200], // NE
+  [-34.4011, -58.6517], // SW (bottom-left of drawing)
+  [-34.3922, -58.6367], // NE (top-right of drawing)
 ]
 
 function loadLots(): Lot[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY)
-    return data ? (JSON.parse(data) as Lot[]) : []
+    if (data) return JSON.parse(data) as Lot[]
   } catch {
-    return []
+    // ignore
   }
+  // First load: seed with pre-loaded data from the official plano
+  saveLots(DEFAULT_LOTS)
+  return DEFAULT_LOTS
 }
 
 function saveLots(lots: Lot[]): void {
