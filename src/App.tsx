@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import DEFAULT_LOTS from './defaultLots'
+// DEFAULT_LOTS contains approximate coords from the plano — available for manual import
 import {
   MapContainer,
   TileLayer,
@@ -63,13 +64,10 @@ const PLANO_BOUNDS_DEFAULT: [[number, number], [number, number]] = [
 function loadLots(): Lot[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY)
-    if (data) return JSON.parse(data) as Lot[]
+    return data ? (JSON.parse(data) as Lot[]) : []
   } catch {
-    // ignore
+    return []
   }
-  // First load: seed with pre-loaded data from the official plano
-  saveLots(DEFAULT_LOTS)
-  return DEFAULT_LOTS
 }
 
 function saveLots(lots: Lot[]): void {
@@ -123,6 +121,8 @@ export default function App() {
   const [searchLote, setSearchLote] = useState('')
   const [foundLot, setFoundLot] = useState<Lot | null>(null)
   const [searchError, setSearchError] = useState('')
+  const [notFoundMz, setNotFoundMz] = useState<number | null>(null)
+  const [notFoundLote, setNotFoundLote] = useState<number | null>(null)
 
   // Admin panel state
   const [adminMz, setAdminMz] = useState('')
@@ -144,6 +144,8 @@ export default function App() {
 
   const handleSearch = () => {
     setSearchError('')
+    setNotFoundMz(null)
+    setNotFoundLote(null)
     const mz = parseInt(searchMz, 10)
     const lt = parseInt(searchLote, 10)
     if (!searchMz || !searchLote || isNaN(mz) || isNaN(lt) || mz < 1 || lt < 1) {
@@ -152,8 +154,9 @@ export default function App() {
     }
     const lot = lots.find(l => l.manzana === mz && l.lote === lt)
     if (!lot) {
-      setSearchError(`No se encontró Mz ${mz} - Lote ${lt}. ¿Está cargado en el sistema?`)
       setFoundLot(null)
+      setNotFoundMz(mz)
+      setNotFoundLote(lt)
       return
     }
     setFoundLot(lot)
@@ -218,6 +221,18 @@ export default function App() {
 
   const openWaze = (lot: Lot) => {
     window.open(`https://waze.com/ul?ll=${lot.lat},${lot.lng}&navigate=yes`, '_blank')
+  }
+
+  const openGoogleMapsSearch = (mz: number, lote: number) => {
+    const q = encodeURIComponent(`Manzana ${mz} Lote ${lote} Santa María de Tigre Tigre Buenos Aires`)
+    window.open(`https://www.google.com/maps/search/${q}`, '_blank')
+  }
+
+  const openGoogleMapsEntrance = () => {
+    window.open(
+      `https://www.google.com/maps/dir/?api=1&destination=${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}&travelmode=driving`,
+      '_blank',
+    )
   }
 
   const exportData = () => {
@@ -432,7 +447,7 @@ export default function App() {
 
             {searchError && <p className="msg msg-error">{searchError}</p>}
 
-            {foundLot && !searchError && (
+            {foundLot && (
               <div className="result">
                 <p className="result-title">
                   📍 Mz {foundLot.manzana} — Lote {foundLot.lote}
@@ -449,10 +464,33 @@ export default function App() {
               </div>
             )}
 
-            {lots.length === 0 && (
-              <p className="hint">
-                No hay lotes cargados aún. Usá ⚙ para agregar las ubicaciones del barrio.
-              </p>
+            {notFoundMz !== null && notFoundLote !== null && (
+              <div className="result result--notfound">
+                <p className="result-title">
+                  Mz {notFoundMz} — Lote {notFoundLote} no está en el mapa
+                </p>
+                <p className="result-sub">Intentá buscar en Google Maps:</p>
+                <div className="nav-row">
+                  <button
+                    className="btn btn-blue nav-btn"
+                    onClick={() => openGoogleMapsSearch(notFoundMz, notFoundLote)}
+                  >
+                    🗺 Buscar en Google Maps
+                  </button>
+                </div>
+                <p className="result-sub" style={{ marginTop: 6 }}>O navegá a la entrada del barrio:</p>
+                <button className="btn btn-outline nav-btn-full" onClick={openGoogleMapsEntrance}>
+                  📍 Ir a la GUARDIA
+                </button>
+              </div>
+            )}
+
+            {!foundLot && notFoundMz === null && (
+              <div className="hint-box">
+                <button className="btn btn-outline nav-btn-full" onClick={openGoogleMapsEntrance}>
+                  📍 Ir a la GUARDIA (entrada del barrio)
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -546,6 +584,18 @@ export default function App() {
                     </label>
                   </div>
                 </div>
+                <button
+                  className="btn btn-sm btn-outline"
+                  style={{ width: '100%', marginTop: 4 }}
+                  onClick={() => {
+                    setLots(DEFAULT_LOTS)
+                    saveLots(DEFAULT_LOTS)
+                    setAdminFeedback({ msg: `✓ ${DEFAULT_LOTS.length} lotes del plano cargados (aprox.)`, ok: true })
+                    setTimeout(() => setAdminFeedback(null), 4000)
+                  }}
+                >
+                  📄 Cargar lotes del plano (aproximado)
+                </button>
 
                 {/* Plano overlay section */}
                 <div className="plano-section">
