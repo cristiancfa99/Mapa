@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import DEFAULT_LOTS from './defaultLots'
 // DEFAULT_LOTS contains approximate coords from the plano — available for manual import
 import {
@@ -6,12 +6,55 @@ import {
   TileLayer,
   CircleMarker,
   Popup,
-  SVGOverlay,
   useMap,
   useMapEvents,
 } from 'react-leaflet'
 import L from 'leaflet'
+import 'leaflet-distortableimage'
+import 'leaflet-distortableimage/dist/leaflet.distortableimage.css'
 import './App.css'
+
+// Draggable/distortable plano overlay using leaflet-distortableimage
+function DistortablePlano({ url, opacity, visible }: { url: string; opacity: number; visible: boolean }) {
+  const map = useMap()
+  const overlayRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (!url) return
+    const [sw, ne] = PLANO_BOUNDS_DEFAULT
+    const corners: [L.LatLng, L.LatLng, L.LatLng, L.LatLng] = [
+      L.latLng(ne[0], sw[1]), // NW
+      L.latLng(ne[0], ne[1]), // NE
+      L.latLng(sw[0], sw[1]), // SW
+      L.latLng(sw[0], ne[1]), // SE
+    ]
+    const overlay = (L as any).distortableImageOverlay(url, {
+      corners,
+      mode: 'distort',
+      selected: true,
+    })
+    overlay.addTo(map)
+    overlayRef.current = overlay
+    return () => {
+      overlay.remove()
+      overlayRef.current = null
+    }
+  }, [url, map])
+
+  useEffect(() => {
+    if (!overlayRef.current) return
+    const el = overlayRef.current.getElement?.()
+    if (el) el.style.opacity = String(opacity)
+  }, [opacity])
+
+  useEffect(() => {
+    if (!overlayRef.current) return
+    const el = overlayRef.current.getElement?.()
+    if (el) el.style.display = visible ? '' : 'none'
+  }, [visible])
+
+  return null
+}
 
 // Fix leaflet default icon path issue with Vite bundler
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
@@ -141,10 +184,6 @@ export default function App() {
   const [planoUrl, setPlanoUrl] = useState<string | null>(null)
   const [planoOpacity, setPlanoOpacity] = useState(0.5)
   const [planoVisible, setPlanoVisible] = useState(true)
-  const [planoOffset, setPlanoOffset] = useState({ lat: 0, lng: 0 })
-  const [planoScaleNS, setPlanoScaleNS] = useState(1.0)
-  const [planoScaleEW, setPlanoScaleEW] = useState(1.0)
-  const [planoRotation, setPlanoRotation] = useState(0)
 
   const handleSearch = () => {
     setSearchError('')
@@ -288,21 +327,6 @@ export default function App() {
     e.target.value = ''
   }
 
-  const planoBounds = (() => {
-    const [sw, ne] = PLANO_BOUNDS_DEFAULT
-    const cLat = (sw[0] + ne[0]) / 2
-    const cLng = (sw[1] + ne[1]) / 2
-    const hLat = ((ne[0] - sw[0]) / 2) * planoScaleNS
-    const hLng = ((ne[1] - sw[1]) / 2) * planoScaleEW
-    return L.latLngBounds(
-      [cLat - hLat + planoOffset.lat, cLng - hLng + planoOffset.lng],
-      [cLat + hLat + planoOffset.lat, cLng + hLng + planoOffset.lng],
-    )
-  })()
-
-  const movePlano = (dLat: number, dLng: number) =>
-    setPlanoOffset(o => ({ lat: o.lat + dLat, lng: o.lng + dLng }))
-
   const isAdminClickActive = mode === 'admin' && !!pendingLot
 
   return (
@@ -402,15 +426,8 @@ export default function App() {
             )
           })}
           {/* Plano overlay */}
-          {planoUrl && planoVisible && (
-            <SVGOverlay
-              bounds={planoBounds}
-              attributes={{ viewBox: '0 0 1 1', preserveAspectRatio: 'none', overflow: 'visible' }}
-            >
-              <g transform={`rotate(${planoRotation}, 0.5, 0.5)`} opacity={planoOpacity}>
-                <image href={planoUrl} x="0" y="0" width="1" height="1" preserveAspectRatio="none" />
-              </g>
-            </SVGOverlay>
+          {planoUrl && (
+            <DistortablePlano url={planoUrl} opacity={planoOpacity} visible={planoVisible} />
           )}
         </MapContainer>
 
@@ -643,7 +660,7 @@ export default function App() {
                           Visible
                         </label>
                         <label className="plano-check">
-                          ⬜ Opacidad
+                          Opacidad
                           <input
                             type="range"
                             min="0.1"
@@ -655,35 +672,7 @@ export default function App() {
                           />
                         </label>
                       </div>
-                      <p className="plano-hint">Mover (~11m por toque):</p>
-                      <div className="plano-arrows">
-                        <button className="arr-btn" onClick={() => movePlano(0.0001, 0)}>▲</button>
-                        <div className="arr-mid">
-                          <button className="arr-btn" onClick={() => movePlano(0, -0.0001)}>◀</button>
-                          <button className="arr-btn arr-reset" onClick={() => { setPlanoOffset({ lat: 0, lng: 0 }); setPlanoScaleNS(1); setPlanoScaleEW(1); setPlanoRotation(0) }}>✕</button>
-                          <button className="arr-btn" onClick={() => movePlano(0, 0.0001)}>▶</button>
-                        </div>
-                        <button className="arr-btn" onClick={() => movePlano(-0.0001, 0)}>▼</button>
-                      </div>
-                      <p className="plano-hint" style={{ marginTop: 8 }}>Rotar:</p>
-                      <div className="plano-row">
-                        <button className="arr-btn" onClick={() => setPlanoRotation(r => r - 5)}>−5°</button>
-                        <button className="arr-btn" onClick={() => setPlanoRotation(r => r - 1)}>−1°</button>
-                        <span style={{ fontSize: 12, color: '#202124', minWidth: 36, textAlign: 'center' }}>{planoRotation}°</span>
-                        <button className="arr-btn" onClick={() => setPlanoRotation(r => r + 1)}>+1°</button>
-                        <button className="arr-btn" onClick={() => setPlanoRotation(r => r + 5)}>+5°</button>
-                      </div>
-                      <p className="plano-hint" style={{ marginTop: 8 }}>Escala N-S / E-W:</p>
-                      <div className="plano-row">
-                        <span style={{ fontSize: 11, color: '#5f6368', minWidth: 24 }}>N-S</span>
-                        <button className="arr-btn" onClick={() => setPlanoScaleNS(s => Math.max(0.5, +(s - 0.02).toFixed(2)))} >−</button>
-                        <span style={{ fontSize: 11, color: '#202124', minWidth: 36, textAlign: 'center' }}>{Math.round(planoScaleNS * 100)}%</span>
-                        <button className="arr-btn" onClick={() => setPlanoScaleNS(s => Math.min(2.5, +(s + 0.02).toFixed(2)))}>+</button>
-                        <span style={{ fontSize: 11, color: '#5f6368', minWidth: 24, marginLeft: 4 }}>E-W</span>
-                        <button className="arr-btn" onClick={() => setPlanoScaleEW(s => Math.max(0.5, +(s - 0.02).toFixed(2)))}>−</button>
-                        <span style={{ fontSize: 11, color: '#202124', minWidth: 36, textAlign: 'center' }}>{Math.round(planoScaleEW * 100)}%</span>
-                        <button className="arr-btn" onClick={() => setPlanoScaleEW(s => Math.min(2.5, +(s + 0.02).toFixed(2)))}>+</button>
-                      </div>
+                      <p className="plano-hint">Arrastrá las esquinas de la imagen para alinearla al mapa</p>
                       <label className="btn btn-sm btn-outline plano-upload-btn" style={{ marginTop: 8 }}>
                         🔄 Cambiar imagen
                         <input
