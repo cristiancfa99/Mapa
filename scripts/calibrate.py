@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""
+Calibrates the raw lot coordinates (extracted from the AutoCAD PDF plano)
+to real-world GPS using Thin-Plate-Spline interpolation over 14 ground-truth
+control points. Then fills missing lot numbers within each manzana by linear
+interpolation and writes src/lots.ts.
+
+Run:  python3 scripts/calibrate.py
+"""
+import json
+import math
+import os
+from collections import defaultdict
+
+import numpy as np
+from scipy.interpolate import RBFInterpolator
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+
+# ── Ground-truth control points: (raw_lat, raw_lng) -> (real_lat, real_lng) ──
+# raw  = coordinate as extracted from the plano PDF (uncalibrated)
+# real = GPS confirmed in the field (Silicon Access app / manual lookup)
+CONTROL = [
+    ((-34.40039,  -58.639886), (-34.3990729, -58.6390500)),  # Mz22 L1
+    ((-34.392942, -58.641393), (-34.3877679, -58.6295901)),  # Mz4  L1
+    ((-34.397949, -58.650096), (-34.3954515, -58.6269717)),  # Mz37 L1
+    ((-34.397344, -58.642955), (-34.3959379, -58.6319985)),  # Mz13 L1
+    ((-34.396182, -58.646926), (-34.393954,  -58.627247 )),  # Mz1  L7
+    ((-34.396819, -58.645013), (-34.393854,  -58.630177 )),  # Mz29 L1
+    ((-34.397072, -58.647924), (-34.391290,  -58.629848 )),  # Mz35 L1
+    ((-34.399495, -58.641581), (-34.396509,  -58.636147 )),  # Mz23 L7
+    ((-34.396679, -58.644772), (-34.394203,  -58.630036 )),  # Mz10 L1
+    ((-34.398435, -58.647666), (-34.390115,  -58.631744 )),  # Mz34 L10
+    ((-34.397671, -58.648589), (-34.389520,  -58.629974 )),  # Mz39 L1
+    ((-34.395131, -58.642379), (-34.397632,  -58.628633 )),  # Mz8  L2
+    ((-34.399057, -58.639289), (-34.399241,  -58.636479 )),  # Mz17 L1
+    ((-34.397399, -58.639079), (-34.400364,  -58.636720 )),  # Mz65 L1
+]
+
+# Lots not present in the PDF, exact GPS provided manually
+MANUAL = {
+    (36, 1): (-34.387368, -58.629817),
+    (31, 1): (-34.389813, -58.633170),
+}
+
+MAX_INTERP_DIST = 120   # metres — only interpolate between close lots
+MAX_GAP = 12            # max missing lot numbers to fill between two known lots
+
+
+def dist_m(a, b):
+    dlat = (a["lat"] - b["lat"]) * 111000
+    dlng = (a["lng"] - b["lng"]) * 84000
+    return math.hypot(dlat, dlng)
+
+
+def main():
+    with open(os.path.join(HERE, "lots_raw.json")) as fp:
+        raw = json.load(fp)
+
+    src = np.array([c[0] for c in CONTROL])
+    dst = np.array([c[1] for c in CONTROL])
+
+    tps_lat = RBFInterpolator(src, dst[:, 0], kernel="thin_plate_spline", degree=1)
+    tps_lng = RBFInterpolator(src, dst[:, 1], kernel="thin_plate_spline", degree=1)
+
+    # Validate control points (should be ~0 m)
+    pred = np.column_stack([tps_lat(src), tps_lng(src)])
+    max_err = 0.0
+    for i, c in enumerate(CONTROL):
+        e = math.hypot((pred[i, 0] - dst[i, 0]) * 111000,
+                       (pred[i, 1] - dst[i, 1]) * 84000)
+        max_err = max(max_err, e)
+    print(f"Max control-point error: {max_err:.3f} m")
+
+    pts = np.array([[l["lat"], l["lng"]] for l in raw])
+    lats = tps_lat(pts)
+    lngs = tps_lng(pts)
+
+    base = []
+    for i, l in enumerate(raw):
+        key = (l["manzana"], l["lote"])
+        if key in MANUAL:
+            lat, lng = MANUAL[key]
+        else:
+            lat, lng = float(lats[i]), float(lngs[i])
+        base.append({"manzana": l["manzana"], "lote": l["lote"],
+                     "lat": round(lat, 7), "lng": round(lng, 7)})
+
+    # ── Interpolate missing lots within each manzana ──
+    by_mz = defaultdict(list)
+    for l in base:
+        by_mz[l["manzana"]].append(l)
+
+    out = list(base)
+    added = 0
+    for mz in sorted(by_mz):
+        mz_lots = sorted(by_mz[mz], key=lambda x: x["lote"])
+        for i in range(len(mz_lots) - 1):
+            a, b = mz_lots[i], mz_lots[i + 1]
+            gap = b["lote"] - a["lote"]
+            if gap <= 1 or gap > MAX_GAP or dist_m(a, b) > MAX_INTERP_DIST:
+                continue
+            for k in range(1, gap):
+                f = k / gap
+                out.append({
+                    "manzana": mz, "lote": a["lote"] + k,
+                    "lat": round(a["lat"] + f * (b["lat"] - a["lat"]), 7),
+                    "lng": round(a["lng"] + f * (b["lng"] - a["lng"]), 7),
+                })
+                added += 1
+
+    # Make sure manual lots exist even if not in raw data
+    for (mz, lt), (lat, lng) in MANUAL.items():
+        if not any(l["manzana"] == mz and l["lote"] == lt for l in out):
+            out.append({"manzana": mz, "lote": lt, "lat": lat, "lng": lng})
+
+    # Deduplicate + sort
+    seen, final = set(), []
+    for l in out:
+        k = (l["manzana"], l["lote"])
+        if k not in seen:
+            seen.add(k)
+            final.append(l)
+    final.sort(key=lambda x: (x["manzana"], x["lote"]))
+
+    print(f"Base: {len(base)}  +interpolated: {added}  total: {len(final)}")
+
+    ts = (
+        "// Auto-generated by scripts/calibrate.py — do not edit by hand.\n"
+        "export interface Lot {\n"
+        "  manzana: number\n"
+        "  lote: number\n"
+        "  lat: number\n"
+        "  lng: number\n"
+        "}\n\n"
+        "export const LOTS: Lot[] = " + json.dumps(final, separators=(",", ":")) + "\n"
+    )
+    with open(os.path.join(ROOT, "src", "lots.ts"), "w") as fp:
+        fp.write(ts)
+    print("Wrote src/lots.ts")
+
+
+if __name__ == "__main__":
+    main()
