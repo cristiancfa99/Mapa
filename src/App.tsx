@@ -10,30 +10,24 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import L from 'leaflet'
-import 'leaflet-distortableimage'
-import 'leaflet-distortableimage/dist/leaflet.distortableimage.css'
+import 'leaflet-imageoverlay-rotated'
 import './App.css'
 
-// Draggable/distortable plano overlay using leaflet-distortableimage
-// Corners computed from KMZ LatLonBox (north/south/east/west + rotation=-19.341°)
-const PLANO_CORNERS: [[number, number], [number, number], [number, number], [number, number]] = [
-  [-34.38862233, -58.64074634], // NW
-  [-34.38470938, -58.62723620], // NE
-  [-34.40558812, -58.63352961], // SW
-  [-34.40167517, -58.62001947], // SE
-]
+// Georeferenced corners from KMZ LatLonBox (rotation -19.341° applied)
+// topleft=NW, topright=NE, bottomleft=SW
+const PLANO_NW = L.latLng(-34.38862233, -58.64074634)
+const PLANO_NE = L.latLng(-34.38470938, -58.62723620)
+const PLANO_SW = L.latLng(-34.40558812, -58.63352961)
 
-function DistortablePlano({ url, opacity, visible }: { url: string; opacity: number; visible: boolean }) {
+function RotatedPlano({ url, opacity, visible }: { url: string; opacity: number; visible: boolean }) {
   const map = useMap()
   const overlayRef = useRef<any>(null)
 
   useEffect(() => {
     if (!url) return
-    const corners = PLANO_CORNERS.map(([lat, lng]) => L.latLng(lat, lng)) as [L.LatLng, L.LatLng, L.LatLng, L.LatLng]
-    const overlay = (L as any).distortableImageOverlay(url, {
-      corners,
-      mode: 'distort',
-      selected: true,
+    const overlay = (L as any).imageOverlay.rotated(url, PLANO_NW, PLANO_NE, PLANO_SW, {
+      opacity,
+      interactive: false,
     })
     overlay.addTo(map)
     overlayRef.current = overlay
@@ -44,14 +38,11 @@ function DistortablePlano({ url, opacity, visible }: { url: string; opacity: num
   }, [url, map])
 
   useEffect(() => {
-    if (!overlayRef.current) return
-    const el = overlayRef.current.getElement?.()
-    if (el) el.style.opacity = String(opacity)
+    overlayRef.current?.setOpacity?.(opacity)
   }, [opacity])
 
   useEffect(() => {
-    if (!overlayRef.current) return
-    const el = overlayRef.current.getElement?.()
+    const el = overlayRef.current?.getElement?.()
     if (el) el.style.display = visible ? '' : 'none'
   }, [visible])
 
@@ -422,7 +413,7 @@ export default function App() {
             )
           })}
           {/* Plano overlay */}
-          <DistortablePlano url={planoUrl} opacity={planoOpacity} visible={planoVisible} />
+          <RotatedPlano url={planoUrl} opacity={planoOpacity} visible={planoVisible} />
         </MapContainer>
 
         {/* Crosshair overlay when placing a lot */}
