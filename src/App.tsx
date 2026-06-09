@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import DEFAULT_LOTS from './defaultLots'
 // DEFAULT_LOTS contains approximate coords from the plano — available for manual import
 import {
@@ -35,6 +35,7 @@ function RotatedPlano({ url, opacity, visible }: { url: string; opacity: number;
     const div = L.DomUtil.create('div', 'leaflet-image-layer leaflet-zoom-animated') as HTMLDivElement
     const img = document.createElement('img')
     img.style.maxWidth = 'none'
+    img.style.display = 'none'   // hide until first transform is applied
 
     const reset = () => {
       const pxTL = map.latLngToLayerPoint(tl)
@@ -59,6 +60,7 @@ function RotatedPlano({ url, opacity, visible }: { url: string; opacity: number;
       const vy = pxBL.subtract(pxTL)
       img.style.transformOrigin = '0 0'
       img.style.transform = `matrix(${vx.x/W},${vx.y/W},${vy.x/H},${vy.y/H},${pxTLInDiv.x},${pxTLInDiv.y})`
+      img.style.display = ''     // show only after transform is applied
     }
 
     img.onload = reset
