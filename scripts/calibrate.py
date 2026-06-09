@@ -53,8 +53,12 @@ MANUAL = {
     (31, 1): (-34.389813, -58.633170),
 }
 
-MAX_INTERP_DIST = 120   # metres — only interpolate between close lots
-MAX_GAP = 12            # max missing lot numbers to fill between two known lots
+# Interpolation only fills a gap when the two known lots are genuinely
+# adjacent in the same row. Lot numbering wraps around each block, so loose
+# thresholds drew straight lines slicing across manzanas ("en fila"). Keep
+# these tight: only short, same-row gaps get filled.
+MAX_INTERP_DIST = 45    # metres — only interpolate between truly adjacent lots
+MAX_GAP = 4             # max missing lot numbers to fill between two known lots
 INLIER_TOL = 60         # metres — control points above this are rejected
 MIN_INLIERS = 6         # never drop below this many control points
 
