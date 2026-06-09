@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import DEFAULT_LOTS from './defaultLots'
 // DEFAULT_LOTS contains approximate coords from the plano — available for manual import
 import {
@@ -10,40 +10,83 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import L from 'leaflet'
-import 'leaflet-imageoverlay-rotated'
 import './App.css'
 
-// Georeferenced corners from KMZ LatLonBox (rotation -19.341° applied)
-// topleft=NW, topright=NE, bottomleft=SW
-const PLANO_NW = L.latLng(-34.38862233, -58.64074634)
-const PLANO_NE = L.latLng(-34.38470938, -58.62723620)
-const PLANO_SW = L.latLng(-34.40558812, -58.63352961)
+// Georeferenced corners computed from KMZ LatLonBox + rotation -19.341°
+const PLANO_CORNERS = {
+  nw: [-34.38862233, -58.64074634] as [number, number],
+  ne: [-34.38470938, -58.62723620] as [number, number],
+  sw: [-34.40558812, -58.63352961] as [number, number],
+}
 
+// Inline rotated image overlay — no library needed.
+// Ported from leaflet-imageoverlay-rotated: positions image via CSS matrix().
 function RotatedPlano({ url, opacity, visible }: { url: string; opacity: number; visible: boolean }) {
   const map = useMap()
-  const overlayRef = useRef<any>(null)
+  const divRef = useRef<HTMLDivElement | null>(null)
+  const imgRef = useRef<HTMLImageElement | null>(null)
 
   useEffect(() => {
-    if (!url) return
-    const overlay = (L as any).imageOverlay.rotated(url, PLANO_NW, PLANO_NE, PLANO_SW, {
-      opacity,
-      interactive: false,
-    })
-    overlay.addTo(map)
-    overlayRef.current = overlay
+    const tl = L.latLng(PLANO_CORNERS.nw[0], PLANO_CORNERS.nw[1])
+    const tr = L.latLng(PLANO_CORNERS.ne[0], PLANO_CORNERS.ne[1])
+    const bl = L.latLng(PLANO_CORNERS.sw[0], PLANO_CORNERS.sw[1])
+
+    const pane = map.getPanes().overlayPane
+    const div = L.DomUtil.create('div', 'leaflet-image-layer leaflet-zoom-animated') as HTMLDivElement
+    const img = document.createElement('img')
+    img.style.maxWidth = 'none'
+
+    const reset = () => {
+      const pxTL = map.latLngToLayerPoint(tl)
+      const pxTR = map.latLngToLayerPoint(tr)
+      const pxBL = map.latLngToLayerPoint(bl)
+      const pxBR = pxTR.subtract(pxTL).add(pxBL)
+
+      const bounds = L.bounds([pxTL, pxTR, pxBL, pxBR])
+      const min = bounds.min!
+      const size = bounds.getSize()
+      const pxTLInDiv = pxTL.subtract(min)
+
+      L.DomUtil.setPosition(div, min)
+      div.style.width  = size.x + 'px'
+      div.style.height = size.y + 'px'
+
+      const W = img.naturalWidth
+      const H = img.naturalHeight
+      if (!W || !H) return
+
+      const vx = pxTR.subtract(pxTL)
+      const vy = pxBL.subtract(pxTL)
+      img.style.transformOrigin = '0 0'
+      img.style.transform = `matrix(${vx.x/W},${vx.y/W},${vy.x/H},${vy.y/H},${pxTLInDiv.x},${pxTLInDiv.y})`
+    }
+
+    img.onload = reset
+    img.src = url
+    div.appendChild(img)
+    pane.appendChild(div)
+    divRef.current = div
+    imgRef.current = img
+
+    map.on('zoomend resetview', reset)
+    reset()
+
     return () => {
-      overlay.remove()
-      overlayRef.current = null
+      map.off('zoomend resetview', reset)
+      if (pane.contains(div)) pane.removeChild(div)
+      divRef.current = null
+      imgRef.current = null
     }
   }, [url, map])
 
   useEffect(() => {
-    overlayRef.current?.setOpacity?.(opacity)
+    const img = imgRef.current
+    if (img) img.style.opacity = String(opacity)
   }, [opacity])
 
   useEffect(() => {
-    const el = overlayRef.current?.getElement?.()
-    if (el) el.style.display = visible ? '' : 'none'
+    const div = divRef.current
+    if (div) div.style.display = visible ? '' : 'none'
   }, [visible])
 
   return null
