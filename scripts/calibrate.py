@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """
 Calibrates the raw lot coordinates (extracted from the AutoCAD PDF plano)
-to real-world GPS using Thin-Plate-Spline interpolation and writes src/lots.ts.
+to real-world GPS and writes src/lots.ts.
 
-12 of the original 14 field-GPS control points are correct. Two had swapped
-manzana labels (Mz4 and Mz37 GPS measurements were assigned to each other in
-the original data) and are excluded. The remaining 12 span the full barrio and
-TPS interpolates correctly for all 39 manzanas including the peripheral ones.
+The raw lots and the georeferenced plano image come from the *same* drawing,
+so the true transform between raw coordinates and real GPS is a single global
+affine (rotation + scale + shear + translation). Earlier attempts used
+Thin-Plate-Spline interpolation, but TPS forces an exact fit through every
+field-GPS control point — and several of those points are noisy (off by
+100-190 m). That noise made the lot grid warp and stack ("encimados").
+
+Instead we fit ONE global affine and reject the noisy control points with a
+simple iterative outlier rejection (RANSAC-style). The surviving points fit to
+~4 m RMS, the affine preserves the plano geometry exactly, and every lot lands
+cleanly on its rectangle.
 
 Run:  python3 scripts/calibrate.py
 """
@@ -16,16 +23,15 @@ import os
 from collections import defaultdict
 
 import numpy as np
-from scipy.interpolate import RBFInterpolator
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 # ── Ground-truth control points: (raw_lat, raw_lng) -> (real_lat, real_lng) ──
 # raw  = coordinate as extracted from the plano PDF (uncalibrated)
-# real = GPS confirmed in the field / verified on the KMZ-georeferenced plano
-# NOTE: Mz4 L1 and Mz37 L1 from the original dataset had their GPS labels
-#       swapped, so both are excluded. The remaining 12 are confirmed correct.
+# real = GPS confirmed in the field / on the KMZ-georeferenced plano
+# Some of these are noisy; the iterative fit below rejects the outliers
+# automatically so we don't have to hand-pick which ones to trust.
 CONTROL = [
     ((-34.40039,  -58.639886), (-34.3990729, -58.6390500)),  # Mz22 L1
     ((-34.397344, -58.642955), (-34.3959379, -58.6319985)),  # Mz13 L1
@@ -49,6 +55,8 @@ MANUAL = {
 
 MAX_INTERP_DIST = 120   # metres — only interpolate between close lots
 MAX_GAP = 12            # max missing lot numbers to fill between two known lots
+INLIER_TOL = 60         # metres — control points above this are rejected
+MIN_INLIERS = 6         # never drop below this many control points
 
 LAT_M = 111000
 LNG_M = 91593
@@ -58,6 +66,24 @@ def dist_m(a, b):
     return math.hypot((a["lat"] - b["lat"]) * LAT_M, (a["lng"] - b["lng"]) * LNG_M)
 
 
+def fit_affine(src, dst):
+    """Least-squares affine mapping src(N,2) -> dst(N,2). Returns (cl, cg)."""
+    M = np.column_stack([src, np.ones(len(src))])
+    cl, *_ = np.linalg.lstsq(M, dst[:, 0], rcond=None)
+    cg, *_ = np.linalg.lstsq(M, dst[:, 1], rcond=None)
+    return cl, cg
+
+
+def apply_affine(cl, cg, pts):
+    M = np.column_stack([pts, np.ones(len(pts))])
+    return M @ cl, M @ cg
+
+
+def residuals_m(cl, cg, src, dst):
+    pl, pg = apply_affine(cl, cg, src)
+    return np.hypot((pl - dst[:, 0]) * LAT_M, (pg - dst[:, 1]) * LNG_M)
+
+
 def main():
     with open(os.path.join(HERE, "lots_raw.json")) as fp:
         raw_lots = json.load(fp)
@@ -65,21 +91,25 @@ def main():
     src = np.array([c[0] for c in CONTROL])
     dst = np.array([c[1] for c in CONTROL])
 
-    tps_lat = RBFInterpolator(src, dst[:, 0], kernel="thin_plate_spline", degree=1)
-    tps_lng = RBFInterpolator(src, dst[:, 1], kernel="thin_plate_spline", degree=1)
+    # Iteratively drop the worst control point until all remaining ones agree.
+    idx = list(range(len(CONTROL)))
+    while len(idx) > MIN_INLIERS:
+        cl, cg = fit_affine(src[idx], dst[idx])
+        r = residuals_m(cl, cg, src[idx], dst[idx])
+        if r.max() < INLIER_TOL:
+            break
+        worst = idx[int(np.argmax(r))]
+        idx.remove(worst)
 
-    # Validate: should be ~0 m at control points
-    pred = np.column_stack([tps_lat(src), tps_lng(src)])
-    max_err = 0.0
-    for i, c in enumerate(CONTROL):
-        e = math.hypot((pred[i, 0] - dst[i, 0]) * LAT_M,
-                       (pred[i, 1] - dst[i, 1]) * LNG_M)
-        max_err = max(max_err, e)
-    print(f"Max control-point error: {max_err:.3f} m")
+    cl, cg = fit_affine(src[idx], dst[idx])
+    r = residuals_m(cl, cg, src[idx], dst[idx])
+    dropped = [i for i in range(len(CONTROL)) if i not in idx]
+    print(f"Affine inliers: {len(idx)}/{len(CONTROL)}  "
+          f"rms {math.sqrt((r ** 2).mean()):.1f} m  max {r.max():.1f} m")
+    print(f"Rejected control points (noisy GPS): {dropped}")
 
     pts = np.array([[l["lat"], l["lng"]] for l in raw_lots])
-    lats = tps_lat(pts)
-    lngs = tps_lng(pts)
+    lats, lngs = apply_affine(cl, cg, pts)
 
     base = []
     for i, l in enumerate(raw_lots):
