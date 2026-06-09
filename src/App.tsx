@@ -55,10 +55,10 @@ const STORAGE_KEY = 'santa-maria-lots'
 const DEFAULT_CENTER: [number, number] = [-34.3997, -58.6386]
 const DEFAULT_ZOOM = 16
 
-// Límites del plano derivados del DWG AutoCAD 1:5000 + anchor GUARDIA=-34.3997,-58.6386
+// Límites calculados a partir de los 669 lotes calibrados con 14 puntos GPS reales
 const PLANO_BOUNDS_DEFAULT: [[number, number], [number, number]] = [
-  [-34.4011, -58.6517], // SW (bottom-left of drawing)
-  [-34.3922, -58.6367], // NE (top-right of drawing)
+  [-34.4021, -58.6415], // SW
+  [-34.3846, -58.6244], // NE
 ]
 
 function loadLots(): Lot[] {
@@ -141,8 +141,9 @@ export default function App() {
   const [planoUrl, setPlanoUrl] = useState<string | null>(null)
   const [planoOpacity, setPlanoOpacity] = useState(0.5)
   const [planoVisible, setPlanoVisible] = useState(true)
-  // Fine-tuning offsets en grados (lat, lng)
   const [planoOffset, setPlanoOffset] = useState({ lat: 0, lng: 0 })
+  const [planoScale, setPlanoScale] = useState(1.0)
+  const [planoStepFine, setPlanoStepFine] = useState(false)
 
   const handleSearch = () => {
     setSearchError('')
@@ -286,13 +287,22 @@ export default function App() {
     e.target.value = ''
   }
 
-  const planoBounds: [[number, number], [number, number]] = [
-    [PLANO_BOUNDS_DEFAULT[0][0] + planoOffset.lat, PLANO_BOUNDS_DEFAULT[0][1] + planoOffset.lng],
-    [PLANO_BOUNDS_DEFAULT[1][0] + planoOffset.lat, PLANO_BOUNDS_DEFAULT[1][1] + planoOffset.lng],
-  ]
+  const planoBounds: [[number, number], [number, number]] = (() => {
+    const [sw, ne] = PLANO_BOUNDS_DEFAULT
+    const cLat = (sw[0] + ne[0]) / 2
+    const cLng = (sw[1] + ne[1]) / 2
+    const hLat = ((ne[0] - sw[0]) / 2) * planoScale
+    const hLng = ((ne[1] - sw[1]) / 2) * planoScale
+    return [
+      [cLat - hLat + planoOffset.lat, cLng - hLng + planoOffset.lng],
+      [cLat + hLat + planoOffset.lat, cLng + hLng + planoOffset.lng],
+    ]
+  })()
 
-  const movePlano = (dLat: number, dLng: number) =>
-    setPlanoOffset(o => ({ lat: o.lat + dLat, lng: o.lng + dLng }))
+  const movePlano = (dLat: number, dLng: number) => {
+    const step = planoStepFine ? 0.1 : 1
+    setPlanoOffset(o => ({ lat: o.lat + dLat * step, lng: o.lng + dLng * step }))
+  }
 
   const isAdminClickActive = mode === 'admin' && !!pendingLot
 
@@ -644,15 +654,24 @@ export default function App() {
                           />
                         </label>
                       </div>
-                      <p className="plano-hint">Ajustá la posición si no coincide con el satélite:</p>
+                      <p className="plano-hint">Posición ({planoStepFine ? 'fino ~10m' : 'grueso ~100m'}):</p>
                       <div className="plano-arrows">
-                        <button className="arr-btn" onClick={() => movePlano(0.0002, 0)}>▲</button>
+                        <button className="arr-btn" onClick={() => movePlano(0.0001, 0)}>▲</button>
                         <div className="arr-mid">
-                          <button className="arr-btn" onClick={() => movePlano(0, -0.0003)}>◀</button>
-                          <button className="arr-btn arr-reset" onClick={() => setPlanoOffset({ lat: 0, lng: 0 })}>✕</button>
-                          <button className="arr-btn" onClick={() => movePlano(0, 0.0003)}>▶</button>
+                          <button className="arr-btn" onClick={() => movePlano(0, -0.0001)}>◀</button>
+                          <button className="arr-btn arr-reset" onClick={() => { setPlanoOffset({ lat: 0, lng: 0 }); setPlanoScale(1) }}>✕</button>
+                          <button className="arr-btn" onClick={() => movePlano(0, 0.0001)}>▶</button>
                         </div>
-                        <button className="arr-btn" onClick={() => movePlano(-0.0002, 0)}>▼</button>
+                        <button className="arr-btn" onClick={() => movePlano(-0.0001, 0)}>▼</button>
+                      </div>
+                      <div className="plano-row" style={{ marginTop: 6 }}>
+                        <label className="plano-check">
+                          <input type="checkbox" checked={planoStepFine} onChange={e => setPlanoStepFine(e.target.checked)} />
+                          Paso fino
+                        </label>
+                        <button className="arr-btn" onClick={() => setPlanoScale(s => Math.max(0.5, s - 0.05))} title="Achicar">−</button>
+                        <span style={{ fontSize: 11, color: '#5f6368' }}>{Math.round(planoScale * 100)}%</span>
+                        <button className="arr-btn" onClick={() => setPlanoScale(s => Math.min(2, s + 0.05))} title="Agrandar">+</button>
                       </div>
                       <label className="btn btn-sm btn-outline plano-upload-btn" style={{ marginTop: 8 }}>
                         🔄 Cambiar imagen
