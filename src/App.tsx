@@ -288,16 +288,16 @@ export default function App() {
     e.target.value = ''
   }
 
-  const planoBounds: [[number, number], [number, number]] = (() => {
+  const planoBounds = (() => {
     const [sw, ne] = PLANO_BOUNDS_DEFAULT
     const cLat = (sw[0] + ne[0]) / 2
     const cLng = (sw[1] + ne[1]) / 2
     const hLat = ((ne[0] - sw[0]) / 2) * planoScaleNS
     const hLng = ((ne[1] - sw[1]) / 2) * planoScaleEW
-    return [
+    return L.latLngBounds(
       [cLat - hLat + planoOffset.lat, cLng - hLng + planoOffset.lng],
       [cLat + hLat + planoOffset.lat, cLng + hLng + planoOffset.lng],
-    ]
+    )
   })()
 
   const movePlano = (dLat: number, dLng: number) =>
