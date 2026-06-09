@@ -129,7 +129,7 @@ const TILES = {
   },
 }
 
-const STORAGE_KEY = 'santa-maria-lots'
+const STORAGE_KEY = 'santa-maria-lots-v3'
 // Barrio Santa María de Tigre — J926+4H Rincón de Milberg
 const DEFAULT_CENTER: [number, number] = [-34.3997, -58.6386]
 const DEFAULT_ZOOM = 16
