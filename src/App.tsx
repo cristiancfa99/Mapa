@@ -15,19 +15,21 @@ import 'leaflet-distortableimage/dist/leaflet.distortableimage.css'
 import './App.css'
 
 // Draggable/distortable plano overlay using leaflet-distortableimage
+// Corners computed from KMZ LatLonBox (north/south/east/west + rotation=-19.341°)
+const PLANO_CORNERS: [[number, number], [number, number], [number, number], [number, number]] = [
+  [-34.38862233, -58.64074634], // NW
+  [-34.38470938, -58.62723620], // NE
+  [-34.40558812, -58.63352961], // SW
+  [-34.40167517, -58.62001947], // SE
+]
+
 function DistortablePlano({ url, opacity, visible }: { url: string; opacity: number; visible: boolean }) {
   const map = useMap()
   const overlayRef = useRef<any>(null)
 
   useEffect(() => {
     if (!url) return
-    const [sw, ne] = PLANO_BOUNDS_DEFAULT
-    const corners: [L.LatLng, L.LatLng, L.LatLng, L.LatLng] = [
-      L.latLng(ne[0], sw[1]), // NW
-      L.latLng(ne[0], ne[1]), // NE
-      L.latLng(sw[0], sw[1]), // SW
-      L.latLng(sw[0], ne[1]), // SE
-    ]
+    const corners = PLANO_CORNERS.map(([lat, lng]) => L.latLng(lat, lng)) as [L.LatLng, L.LatLng, L.LatLng, L.LatLng]
     const overlay = (L as any).distortableImageOverlay(url, {
       corners,
       mode: 'distort',
@@ -97,12 +99,6 @@ const STORAGE_KEY = 'santa-maria-lots'
 // Barrio Santa María de Tigre — J926+4H Rincón de Milberg
 const DEFAULT_CENTER: [number, number] = [-34.3997, -58.6386]
 const DEFAULT_ZOOM = 16
-
-// Límites calculados a partir de los 669 lotes calibrados con 14 puntos GPS reales
-const PLANO_BOUNDS_DEFAULT: [[number, number], [number, number]] = [
-  [-34.4021, -58.6415], // SW
-  [-34.3846, -58.6244], // NE
-]
 
 function loadLots(): Lot[] {
   try {
@@ -180,8 +176,8 @@ export default function App() {
   const [flyTarget, setFlyTarget] = useState<{ pos: [number, number]; zoom: number } | null>(null)
   const [tileLayer, setTileLayer] = useState<TileMode>('satellite')
 
-  // Plano overlay
-  const [planoUrl, setPlanoUrl] = useState<string | null>(null)
+  // Plano overlay — bundled georeferenced image from KMZ
+  const [planoUrl, setPlanoUrl] = useState<string>('./mapa.png')
   const [planoOpacity, setPlanoOpacity] = useState(0.5)
   const [planoVisible, setPlanoVisible] = useState(true)
 
@@ -426,9 +422,7 @@ export default function App() {
             )
           })}
           {/* Plano overlay */}
-          {planoUrl && (
-            <DistortablePlano url={planoUrl} opacity={planoOpacity} visible={planoVisible} />
-          )}
+          <DistortablePlano url={planoUrl} opacity={planoOpacity} visible={planoVisible} />
         </MapContainer>
 
         {/* Crosshair overlay when placing a lot */}
@@ -637,44 +631,41 @@ export default function App() {
 
                 {/* Plano overlay section */}
                 <div className="plano-section">
-                  <p className="plano-title">🗒 Overlay del Plano</p>
-                  {!planoUrl ? (
-                    <label className="btn btn-sm btn-outline plano-upload-btn">
-                      📷 Cargar foto del plano
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={handlePlanoUpload}
-                      />
-                    </label>
-                  ) : (
-                    <div className="plano-controls">
-                      <div className="plano-row">
-                        <label className="plano-check">
-                          <input
-                            type="checkbox"
-                            checked={planoVisible}
-                            onChange={e => setPlanoVisible(e.target.checked)}
-                          />
-                          Visible
-                        </label>
-                        <label className="plano-check">
-                          Opacidad
-                          <input
-                            type="range"
-                            min="0.1"
-                            max="0.9"
-                            step="0.05"
-                            value={planoOpacity}
-                            onChange={e => setPlanoOpacity(Number(e.target.value))}
-                            className="opacity-slider"
-                          />
-                        </label>
-                      </div>
-                      <p className="plano-hint">Arrastrá las esquinas de la imagen para alinearla al mapa</p>
-                      <label className="btn btn-sm btn-outline plano-upload-btn" style={{ marginTop: 8 }}>
-                        🔄 Cambiar imagen
+                  <p className="plano-title">🗒 Plano del barrio</p>
+                  <div className="plano-controls">
+                    <div className="plano-row">
+                      <label className="plano-check">
+                        <input
+                          type="checkbox"
+                          checked={planoVisible}
+                          onChange={e => setPlanoVisible(e.target.checked)}
+                        />
+                        Visible
+                      </label>
+                      <label className="plano-check">
+                        Opacidad
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="0.9"
+                          step="0.05"
+                          value={planoOpacity}
+                          onChange={e => setPlanoOpacity(Number(e.target.value))}
+                          className="opacity-slider"
+                        />
+                      </label>
+                    </div>
+                    <p className="plano-hint">Arrastrá las esquinas de la imagen para ajustar</p>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button
+                        className="btn btn-sm btn-outline"
+                        style={{ flex: 1 }}
+                        onClick={() => setPlanoUrl('./mapa.png')}
+                      >
+                        ↩ Plano oficial
+                      </button>
+                      <label className="btn btn-sm btn-outline" style={{ flex: 1 }}>
+                        📷 Otra imagen
                         <input
                           type="file"
                           accept="image/*"
@@ -683,7 +674,7 @@ export default function App() {
                         />
                       </label>
                     </div>
-                  )}
+                  </div>
                 </div>
               </>
             )}
