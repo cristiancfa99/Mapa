@@ -6,7 +6,7 @@ import {
   TileLayer,
   CircleMarker,
   Popup,
-  ImageOverlay,
+  SVGOverlay,
   useMap,
   useMapEvents,
 } from 'react-leaflet'
@@ -142,8 +142,9 @@ export default function App() {
   const [planoOpacity, setPlanoOpacity] = useState(0.5)
   const [planoVisible, setPlanoVisible] = useState(true)
   const [planoOffset, setPlanoOffset] = useState({ lat: 0, lng: 0 })
-  const [planoScale, setPlanoScale] = useState(1.0)
-  const [planoStepFine, setPlanoStepFine] = useState(false)
+  const [planoScaleNS, setPlanoScaleNS] = useState(1.0)
+  const [planoScaleEW, setPlanoScaleEW] = useState(1.0)
+  const [planoRotation, setPlanoRotation] = useState(0)
 
   const handleSearch = () => {
     setSearchError('')
@@ -291,18 +292,16 @@ export default function App() {
     const [sw, ne] = PLANO_BOUNDS_DEFAULT
     const cLat = (sw[0] + ne[0]) / 2
     const cLng = (sw[1] + ne[1]) / 2
-    const hLat = ((ne[0] - sw[0]) / 2) * planoScale
-    const hLng = ((ne[1] - sw[1]) / 2) * planoScale
+    const hLat = ((ne[0] - sw[0]) / 2) * planoScaleNS
+    const hLng = ((ne[1] - sw[1]) / 2) * planoScaleEW
     return [
       [cLat - hLat + planoOffset.lat, cLng - hLng + planoOffset.lng],
       [cLat + hLat + planoOffset.lat, cLng + hLng + planoOffset.lng],
     ]
   })()
 
-  const movePlano = (dLat: number, dLng: number) => {
-    const step = planoStepFine ? 0.1 : 1
-    setPlanoOffset(o => ({ lat: o.lat + dLat * step, lng: o.lng + dLng * step }))
-  }
+  const movePlano = (dLat: number, dLng: number) =>
+    setPlanoOffset(o => ({ lat: o.lat + dLat, lng: o.lng + dLng }))
 
   const isAdminClickActive = mode === 'admin' && !!pendingLot
 
@@ -404,12 +403,14 @@ export default function App() {
           })}
           {/* Plano overlay */}
           {planoUrl && planoVisible && (
-            <ImageOverlay
-              url={planoUrl}
+            <SVGOverlay
               bounds={planoBounds}
-              opacity={planoOpacity}
-              zIndex={5}
-            />
+              attributes={{ viewBox: '0 0 1 1', preserveAspectRatio: 'none', overflow: 'visible' }}
+            >
+              <g transform={`rotate(${planoRotation}, 0.5, 0.5)`} opacity={planoOpacity}>
+                <image href={planoUrl} x="0" y="0" width="1" height="1" preserveAspectRatio="none" />
+              </g>
+            </SVGOverlay>
           )}
         </MapContainer>
 
@@ -654,24 +655,34 @@ export default function App() {
                           />
                         </label>
                       </div>
-                      <p className="plano-hint">Posición ({planoStepFine ? 'fino ~10m' : 'grueso ~100m'}):</p>
+                      <p className="plano-hint">Mover (~11m por toque):</p>
                       <div className="plano-arrows">
                         <button className="arr-btn" onClick={() => movePlano(0.0001, 0)}>▲</button>
                         <div className="arr-mid">
                           <button className="arr-btn" onClick={() => movePlano(0, -0.0001)}>◀</button>
-                          <button className="arr-btn arr-reset" onClick={() => { setPlanoOffset({ lat: 0, lng: 0 }); setPlanoScale(1) }}>✕</button>
+                          <button className="arr-btn arr-reset" onClick={() => { setPlanoOffset({ lat: 0, lng: 0 }); setPlanoScaleNS(1); setPlanoScaleEW(1); setPlanoRotation(0) }}>✕</button>
                           <button className="arr-btn" onClick={() => movePlano(0, 0.0001)}>▶</button>
                         </div>
                         <button className="arr-btn" onClick={() => movePlano(-0.0001, 0)}>▼</button>
                       </div>
-                      <div className="plano-row" style={{ marginTop: 6 }}>
-                        <label className="plano-check">
-                          <input type="checkbox" checked={planoStepFine} onChange={e => setPlanoStepFine(e.target.checked)} />
-                          Paso fino
-                        </label>
-                        <button className="arr-btn" onClick={() => setPlanoScale(s => Math.max(0.5, s - 0.05))} title="Achicar">−</button>
-                        <span style={{ fontSize: 11, color: '#5f6368' }}>{Math.round(planoScale * 100)}%</span>
-                        <button className="arr-btn" onClick={() => setPlanoScale(s => Math.min(2, s + 0.05))} title="Agrandar">+</button>
+                      <p className="plano-hint" style={{ marginTop: 8 }}>Rotar:</p>
+                      <div className="plano-row">
+                        <button className="arr-btn" onClick={() => setPlanoRotation(r => r - 5)}>−5°</button>
+                        <button className="arr-btn" onClick={() => setPlanoRotation(r => r - 1)}>−1°</button>
+                        <span style={{ fontSize: 12, color: '#202124', minWidth: 36, textAlign: 'center' }}>{planoRotation}°</span>
+                        <button className="arr-btn" onClick={() => setPlanoRotation(r => r + 1)}>+1°</button>
+                        <button className="arr-btn" onClick={() => setPlanoRotation(r => r + 5)}>+5°</button>
+                      </div>
+                      <p className="plano-hint" style={{ marginTop: 8 }}>Escala N-S / E-W:</p>
+                      <div className="plano-row">
+                        <span style={{ fontSize: 11, color: '#5f6368', minWidth: 24 }}>N-S</span>
+                        <button className="arr-btn" onClick={() => setPlanoScaleNS(s => Math.max(0.5, +(s - 0.02).toFixed(2)))} >−</button>
+                        <span style={{ fontSize: 11, color: '#202124', minWidth: 36, textAlign: 'center' }}>{Math.round(planoScaleNS * 100)}%</span>
+                        <button className="arr-btn" onClick={() => setPlanoScaleNS(s => Math.min(2.5, +(s + 0.02).toFixed(2)))}>+</button>
+                        <span style={{ fontSize: 11, color: '#5f6368', minWidth: 24, marginLeft: 4 }}>E-W</span>
+                        <button className="arr-btn" onClick={() => setPlanoScaleEW(s => Math.max(0.5, +(s - 0.02).toFixed(2)))}>−</button>
+                        <span style={{ fontSize: 11, color: '#202124', minWidth: 36, textAlign: 'center' }}>{Math.round(planoScaleEW * 100)}%</span>
+                        <button className="arr-btn" onClick={() => setPlanoScaleEW(s => Math.min(2.5, +(s + 0.02).toFixed(2)))}>+</button>
                       </div>
                       <label className="btn btn-sm btn-outline plano-upload-btn" style={{ marginTop: 8 }}>
                         🔄 Cambiar imagen
